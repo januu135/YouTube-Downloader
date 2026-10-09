@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+{% load static %}
+   <html>
+    <head>
+        <h1>YouTube Video Downloader</h1>
+        <nav>
+            <a href="{%url 'download_video'%}">Home </a>
+            <a href="#">Contact</a>
+            <a href="#">Privacy Policy</a>
+            <div class="dropdown">
+                <button>Languages</button>
+                <div class="dropdown-options">
+                  <a href="{%url 'download_video'%}">English</a>
+                  <a href="{%url 'br'%}">Brazil</a>
+                  <a href="{%url 'fr'%}">France</a>
+                  <a href="{%url 'id'%}">Indonesia</a>
+                </div>
+              </div>
+            
+        </nav>
+   
+    </head>
+    <body>       
+
+    <div class="background">
+        <div class="title">
+            <p>Y2mate, Youtube To MP3</p>
+        </div>
+
+        <div class="content">
+            <form action="" method="post">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <input type="submit" value="Download" class="btn btn-info btn-block">
+            </form>
+        </div>
+    </div>
+
+    {% if title %}
+        <div class="dbox">
+            <div class="img-thumb">
+                <img class="img-responsive" src="{{ thumb }}">
+            </div>
+            <div id="desl" class="v-about">
+                <p class="v-title">{{ title }}</p>
+                <section class="infos">
+
+                    <li>Duration <b>{{ duration }}</b></li>
+                    <li>Views <b>{{ views }}</b></li>
+                    <li>Likes <b>{{ likes }}</b></li>
+                    <li>Dislikes <b>{{ dislikes }}</b</li>
+
+                </section>
+            </div>
+        </div>
+
+        <div id="m-show">
+            <p class="v-title">{{ title }}</p>
+        </div>
+        <div class="downloads">
+
+            <table>
+                <tr>
+                    <th scope="col">Resolution</th>
+                    <th scope="col">File Size</th>
+                    <th scope="col">Extension</th>
+                    <th scope="col">Download</th>
+                </tr>
+                <tr>
+                    {% for stream in streams %}
+                        <tr>
+                            <td>{{ stream.resolution }}</td>
+                            <td>{{ stream.file_size }}</td>
+                            <td>{{ stream.extension }}</td>
+                            <td><a href="{{ stream.video_url }}" style="text-decoration: none;"
+                                   download="{{ title }}.{{ extension }}" target="_blank">Download <i
+                                    class=" fa fa-download"></i></a></td>
+                        </tr>
+                    {% endfor %}
+                </tr>
+            </table>
+
+            <p class="h3 text-center mt-5 mb-5">Audio Only</p>
+            <table class="table mt-5 mb-5">
+                <thead class="thead-light">
+                <tr>
+                    <th scope="col">File Size</th>
+                    <th scope="col">Extension</th>
+                    <th scope="col">Download</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for stream in stream_audio %}
+                    <tr>
+                        <td>{{ stream.file_size }}</td>
+                        <td>{{ stream.extension }}</td>
+                        <td><a href="{{ stream.video_url }}" style="text-decoration: none;"
+                               download="{{ title }}.{{ extension }}" target="_blank">Download <i
+                                class=" fa fa-download"></i></a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            {##}
+            {#            <p class="h3 text-center mt-5 mb-5">Video Only</p>#}
+            {#            <table class="table mt-5">#}
+            {#                <thead class="thead-light">#}
+            {#                <tr>#}
+            {#                    <th scope="col">Resolution</th>#}
+            {#                    <th scope="col">File Size</th>#}
+            {#                    <th scope="col">Extension</th>#}
+            {#                    <th scope="col" >Download</th>#}
+            {#                </tr>#}
+            {#                </thead>#}
+            {#                <tbody>#}
+            {#                {% for stream in stream_video %}#}
+            {#                    <tr>#}
+            {#                        <td>{{ stream.resolution }}</td>#}
+            {#                        <td>{{ stream.file_size }}</td>#}
+            {#                        <td>{{ stream.extension }}</td>#}
+            {#                        <td><a href="{{ stream.video_url }}" style="text-decoration: none;"#}
+            {#                               download="{{ title }}.{{ extension }}" target="_blank">Download <i#}
+            {#                                class=" fa fa-download"></i></a></td>#}
+            {#                    </tr>#}
+            {#                {% endfor %}#}
+            {#                </tbody>#}
+            {#            </table>#}
+            {##}
+        </div>
+
+    {% endif %}
+    <br>
+    <section>
+        <div class="container2">
+            <h2>What are the steps for downloading YouTube videos on the phone?</h2>
+            <P>Download YouTube videos on your phone by simply pasting the link into Y2mate and then saving it.
+                Steps which you have to follow:</P>
+            <p>1: First, open the youtube app and go to a video you want to download.
+            </p>
+            <p>2: Click the Share button below the video and select the Copy link.
+            </p>
+            <img src="{%static "YouTube-Downloader/images/1.webp" %}">
+            <p>3: Go to y2-mate.net using your phone's browser.
+            </p>
+            <p>
+                4: Paste the link in the search box at the top of the page.
+            </p>
+            <p>
+                5: After pasting the link, You will get videos in available resolutions and output formats.
+            </p>
+            <p>
+             6: Tap the Download button to save the video in the desired resolution.
+            </p>
+            <img src="{%static "YouTube-Downloader/images/1.webp" %}">
+            <p>7: Depending on the file size, the video should be saved to your phone within a few seconds or minutes.
+            </p>
+            <h2>What are the steps for downloading YouTube videos on a PC?</h2>
+            <p>Youtube Video Downloader online for your computer.
+                Steps which you have to follow:
+            </p>
+            <p>1: Open YouTube's website and click on the video you want to download.
+            </p>
+            <p>2: From your browser's address bar, copy the video link.
+            </p>
+            <img src="{%static "YouTube-Downloader/images/1.webp" %}">
+            <p> 3: Use the search box at the top of this page to enter the link into Y2mate.
+            </p>
+            <p>4: A search for the video will be initiated automatically by Y2mate. In a few seconds, you will get the results..
+            </p>
+            <img src="{%static "YouTube-Downloader/images/1.webp" %}">
+            <p>5: Click the Download button and save.
+            </P>
+            <p>
+                6: You can view the YouTube video on your computer after downloading it.
+            </p>
+            <img src="{%static "YouTube-Downloader/images/1.webp" %}">
+        </div>
+       </section>
+       <footer class="footer">
+        <div class="container1">
+            <div class="row">
+                <div class="footer-col">
+                    
+                    <ul>
+                        <li><a href="#">y2-mate.net</a></li>
+                        <li><a href="#">Youtube Downloader</a></li>
+                        <li><a href="#">Youtube Converter</a></li>
+                        <li><a href="#">Youtube Converter</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    
+                    <ul>
+                        <li><a href="{%url 'download_video'%}">English</a></li>
+                        <li><a href="{%url 'br'%}">Brazil </a></li>
+                        <li><a href="{%url 'fr'%}">France </a></li>
+                        <li><a href="{%url 'id'%}">Indonesia</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    
+                    <ul>
+                        <li><a href="#">About Us</a></li>
+                        <li><a href="#">Contact </a></li>
+                        <li><a href="#">Terms of Service</a></li>
+                        <li><a href="#">Privacy Policy</a></li>
+                    </ul>
+                </div>
+                
+            </div>
+            
+        </div>
+        <br>
+        <br>
+        <div class="container">
+            <p style="text-align: center; color: white;">© Copyright 2023 by y2-mate.net</p>
+        </div>
+   </footer>
+   
+ 
+
+{% endblock %}
+<script>
+    $(function(){
+    $('.selectpicker').selectpicker();
+});
+</script>
+
+</body>
+</html>
