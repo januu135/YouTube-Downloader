@@ -14,6 +14,11 @@ def get_video_data(video_url):
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        },
     }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
