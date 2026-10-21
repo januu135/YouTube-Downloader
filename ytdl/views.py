@@ -35,11 +35,107 @@ DEFAULT_COOKIES = """# Netscape HTTP Cookie File
 """
 
 
+try:
+    from pytubefix import YouTube as PytubeFixYouTube
+except ImportError:
+    PytubeFixYouTube = None
+
+
+def get_video_data_pytubefix(video_url):
+    """
+    Extract YouTube video information using pytubefix.
+    Bypasses YouTube bot detection on cloud/datacenter IPs.
+    """
+    yt = PytubeFixYouTube(video_url)
+
+    video_streams = []
+    audio_streams = []
+    seen_video_keys = set()
+    seen_audio_keys = set()
+
+    for s in yt.streams:
+        ext = getattr(s, "subtype", "mp4") or "mp4"
+        fs = getattr(s, "filesize", None) or getattr(s, "filesize_approx", None)
+        if fs:
+            try:
+                file_size_str = f"{round(int(fs) / (1024 * 1024), 2)} MB"
+            except Exception:
+                file_size_str = "Unknown"
+        else:
+            file_size_str = "Unknown"
+
+        stream_url = getattr(s, "url", None)
+        if not stream_url:
+            continue
+
+        resolution = getattr(s, "resolution", None)
+        if resolution:
+            key = (resolution, ext)
+            if key not in seen_video_keys:
+                seen_video_keys.add(key)
+                res_num = 0
+                try:
+                    res_num = int(re.sub(r"\D", "", resolution) or 0)
+                except Exception:
+                    pass
+                video_streams.append({
+                    "resolution": resolution,
+                    "height": res_num,
+                    "extension": ext,
+                    "file_size": file_size_str,
+                    "video_url": stream_url,
+                })
+        else:
+            abr = getattr(s, "abr", "") or ""
+            key = (ext, abr)
+            if key not in seen_audio_keys:
+                seen_audio_keys.add(key)
+                audio_streams.append({
+                    "extension": ext,
+                    "file_size": file_size_str,
+                    "video_url": stream_url,
+                })
+
+    video_streams.sort(key=lambda s: s.get("height", 0), reverse=True)
+
+    duration = 0
+    if getattr(yt, "length", None):
+        try:
+            duration = round(int(yt.length) / 60, 2)
+        except Exception:
+            duration = 0
+
+    views = "0"
+    if getattr(yt, "views", None):
+        try:
+            views = f"{int(yt.views):,}"
+        except Exception:
+            views = "0"
+
+    context = {
+        "title": getattr(yt, "title", "Unknown Title") or "Unknown Title",
+        "streams": video_streams,
+        "stream_audio": audio_streams,
+        "description": getattr(yt, "description", "") or "",
+        "likes": 0,
+        "dislikes": 0,
+        "thumb": getattr(yt, "thumbnail_url", "") or "",
+        "duration": duration,
+        "views": views,
+    }
+    return context
+
+
 def get_video_data(video_url):
     """
-    Extract YouTube video information using yt-dlp with cookie authentication
-    and safely handle formats, audio streams, and missing fields.
+    Extract YouTube video information using pytubefix (primary)
+    with yt-dlp as a fallback.
     """
+    if PytubeFixYouTube is not None:
+        try:
+            return get_video_data_pytubefix(video_url)
+        except Exception as e:
+            print("pytubefix error, falling back to yt-dlp:", e)
 
     # Locate or create cookies.txt reliably across server environments
     possible_paths = [
