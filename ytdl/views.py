@@ -7,6 +7,35 @@ from .forms import DownloadForm
 import re
 
 
+DEFAULT_COOKIES = """# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.youtube.com	TRUE	/	TRUE	1792613414	GPS	1
+.youtube.com	TRUE	/	TRUE	1827171625	__Secure-3PAPISID	pEbOLB5KVaMsZk7n/Ahfl0mDU10rTdA_s3
+.youtube.com	TRUE	/	TRUE	1827171625	PREF	f4=4000000&tz=Asia.Calcutta
+.youtube.com	TRUE	/	TRUE	1824147618	__Secure-1PSIDTS	sidts-CjUBkldj_yiDCd3GdBvehsLTs6ic3gSloiCP3Ee0nkyCS7tP9Ey4zYylxMGuyVGuH7-96MH4OhAA
+.youtube.com	TRUE	/	TRUE	1824147618	__Secure-3PSIDTS	sidts-CjUBkldj_yiDCd3GdBvehsLTs6ic3gSloiCP3Ee0nkyCS7tP9Ey4zYylxMGuyVGuH7-96MH4OhAA
+.youtube.com	TRUE	/	FALSE	1827171625	HSID	AyBrwri5RHg2BYPJ9
+.youtube.com	TRUE	/	TRUE	1827171625	SSID	AW4Mqtucfz1vWm4aU
+.youtube.com	TRUE	/	FALSE	1827171625	APISID	vaIfVq_Be5x4smK_/AVkrWDb_PrLqotnVk
+.youtube.com	TRUE	/	TRUE	1827171625	SAPISID	pEbOLB5KVaMsZk7n/Ahfl0mDU10rTdA_s3
+.youtube.com	TRUE	/	TRUE	1827171625	__Secure-1PAPISID	pEbOLB5KVaMsZk7n/Ahfl0mDU10rTdA_s3
+.youtube.com	TRUE	/	TRUE	1827171620	LOGIN_INFO	AFmmF2swRAIgZo9UFfdBlVZszWVkwv8gpGAdw4Q9slogIxaixJvX9HcCIGUh2DhWaTnK99B9UDUFZpJJpl5tOJ3BrassvC3FjywR:QUQ3MjNmelI1OGgzMkp6RGdCbW5rSklxek5qZ0xHdmJFcXcweW43TmlCdlBnVDNDVjgzWTVKYWMyZW1icV9zWm1UVXNkVC1qSmFKX3pVQ0Y4OUNmQWJiRWp3aUxLbkZfU1ZOczJHejNEcGdsSkdfeUxyaF9uYWZDbENFalgtajVYX250d0FZUTdTeDZGWjdnbzhqZzZzRzJSV1hrV0V4bWNR
+.youtube.com	TRUE	/	FALSE	1827171625	SID	g.a000Dwm_hxzKFAxWzFr9x4mXYNa-znqC_SdbU7O91RBxzH8qPQ3tKilgZvSKCqvZHKQu0i8AagACgYKAc8SARMSFQHGX2Mizg2a_6Kn5R10Rk26QONYeRoVAUF8yKrs_yqzPXo3hmp_k1IhWFqo0076
+.youtube.com	TRUE	/	TRUE	1827171625	__Secure-1PSID	g.a000Dwm_hxzKFAxWzFr9x4mXYNa-znqC_SdbU7O91RBxzH8qPQ3tpzwi8YVywfcab1iC7HNZkgACgYKAZgSARMSFQHGX2MilC36cveFhCJz6OTocNuFlRoVAUF8yKqDIzcg_cbwEB_Uig__UcNQ0076
+.youtube.com	TRUE	/	TRUE	1827171625	__Secure-3PSID	g.a000Dwm_hxzKFAxWzFr9x4mXYNa-znqC_SdbU7O91RBxzH8qPQ3tTLg4EKg3wcbqULYVEikTvgACgYKAYsSARMSFQHGX2MiJpne9XAgKYx1HenYql9P1RoVAUF8yKobVWuVIeqjDydfjd_YIwwj0076
+.youtube.com	TRUE	/	FALSE	1824147628	SIDCC	APD_SKEHm-h6tqESAAl668Bprb5vyPvFINwbaqq0UUNffW0ApU_TOGDsuhkIXZVDUYKiAaLMAQ
+.youtube.com	TRUE	/	TRUE	1824147628	__Secure-1PSIDCC	APD_SKF9_r79_Pz1_BwLCfyw6tDyeL5tvEgAWaQctkKcOsd-eV7fliLWiKqSoCqPCaZ-BFiA
+.youtube.com	TRUE	/	TRUE	1824147628	__Secure-3PSIDCC	APD_SKEWCqs4rUnIYdGVGqBLGr7pwJOTd60xh1kU8suITIKoefiPycTI28hW6O-f1yijL34N
+.youtube.com	TRUE	/	TRUE	0	YSC	3VVVjqdAPww
+.youtube.com	TRUE	/	TRUE	1808163620	VISITOR_INFO1_LIVE	xlBl4rgXDu8
+.youtube.com	TRUE	/	TRUE	1808163620	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgOQ%3D%3D
+.youtube.com	TRUE	/	TRUE	1808163614	__Secure-YNID	CtoBCAUSjAEB8QZuZmVltVyrBMz-28gl-hSvNIVEpuHLz3zJJsDTF9G2ewPupgVhL7SQc_UesBoarY0sBPwZzQ2flMtIER5uY3ikcHullUmIG4ANq7_Hv-fXZ0HudJ-pooyhqOziiS11WnS6FcMVrB-wIwybqFq0ZulQx47fzM9yI1cs3JkgcznytOT7DC1KHxR8BigFMkUB3qmdTxinw8cH_4zWToGEc5BkSp6O27x7wUMAwia8MpdPMpWO88peNZRyOlfLxfzcL3D1obXaTEwwdiTV5kTydxxNbgA
+.youtube.com	TRUE	/	TRUE	1808163615	__Secure-ROLLOUT_TOKEN	CNfSytCfyo_hzQEQ-8DE0-7LlwMYopOM1O7LlwM%3D
+"""
+
+
 def get_video_data(video_url):
     """
     Extract YouTube video information using yt-dlp with cookie authentication
@@ -18,6 +47,14 @@ def get_video_data(video_url):
     )
     if not os.path.isabs(str(cookies_path)):
         cookies_path = os.path.join(settings.BASE_DIR, cookies_path)
+
+    # Auto-create cookies.txt if it does not exist
+    if not os.path.exists(cookies_path):
+        try:
+            with open(cookies_path, "w", encoding="utf-8") as f:
+                f.write(DEFAULT_COOKIES.strip() + "\n")
+        except Exception as e:
+            print("Warning: unable to create cookies file:", e)
 
     ydl_opts = {
         "quiet": True,
