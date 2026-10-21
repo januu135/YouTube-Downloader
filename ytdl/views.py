@@ -41,26 +41,61 @@ def get_video_data(video_url):
     and safely handle formats, audio streams, and missing fields.
     """
 
-    cookies_path = getattr(
-        settings, "COOKIES_FILE", os.path.join(settings.BASE_DIR, "cookies.txt")
-    )
-    if not os.path.isabs(str(cookies_path)):
-        cookies_path = os.path.join(settings.BASE_DIR, cookies_path)
+    # Locate or create cookies.txt reliably across server environments
+    possible_paths = [
+        getattr(settings, "COOKIES_FILE", None),
+        os.path.join(str(settings.BASE_DIR), "cookies.txt"),
+        "/var/www/YouTube-Downloader/cookies.txt",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt"),
+    ]
 
-    # Auto-create cookies.txt if it does not exist
-    if not os.path.exists(cookies_path):
+    cookies_path = None
+    for p in possible_paths:
+        if p and os.path.exists(str(p)) and os.path.getsize(str(p)) > 100:
+            cookies_path = str(p)
+            break
+
+    # If cookies file is missing or empty, auto-create it
+    if not cookies_path:
+        target_path = os.path.join(str(settings.BASE_DIR), "cookies.txt")
         try:
-            with open(cookies_path, "w", encoding="utf-8") as f:
+            with open(target_path, "w", encoding="utf-8") as f:
                 f.write(DEFAULT_COOKIES.strip() + "\n")
-        except Exception as e:
-            print("Warning: unable to create cookies file:", e)
+            cookies_path = target_path
+        except Exception:
+            tmp_path = "/tmp/youtube_cookies.txt"
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    f.write(DEFAULT_COOKIES.strip() + "\n")
+                cookies_path = tmp_path
+            except Exception as e:
+                print("Warning: unable to create cookies fallback file:", e)
+                cookies_path = target_path
+
+    # Make readable by all users (e.g. www-data / gunicorn)
+    if cookies_path and os.path.exists(cookies_path):
+        try:
+            os.chmod(cookies_path, 0o666)
+        except Exception:
+            pass
 
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
+        "source_address": "0.0.0.0",  # Force IPv4 to prevent datacenter IPv6 bot check
+        "cachedir": False,  # Prevent stale cache across workers
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/129.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        },
     }
 
-    if os.path.exists(cookies_path):
+    if cookies_path and os.path.exists(cookies_path):
         ydl_opts["cookiefile"] = str(cookies_path)
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
