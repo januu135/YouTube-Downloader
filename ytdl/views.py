@@ -11,17 +11,36 @@ def is_valid_youtube_url(video_url):
     """
     if not video_url:
         return False
-    pattern = r"^(https?://)?((www|m)\.)?(youtube\.com|youtu\.be)(/.+)?$"
-    return re.match(pattern, video_url) is not None
+    pattern = r"^(https?://)?((www|m|music)\.)?(youtube\.com|youtu\.be)(/.+)?$"
+    return re.match(pattern, video_url.strip()) is not None
 
 
 def get_video_data(video_url):
     """
     Extract YouTube video information using pytubefix.
+    Tries multiple client profiles (WEB, ANDROID, MWEB, IOS) for resilience.
     Directly retrieves title, author, views, duration, thumbnail,
     and all video/audio streams with download URLs without requiring cookies.
     """
-    yt = YouTube(video_url)
+    video_url = video_url.strip()
+    yt = None
+    last_err = None
+
+    for client_name in ["WEB", "ANDROID", "MWEB", "IOS"]:
+        try:
+            candidate_yt = YouTube(video_url, client=client_name)
+            # test stream access to ensure signatures decrypt properly
+            _ = candidate_yt.streams
+            yt = candidate_yt
+            break
+        except Exception as e:
+            last_err = e
+            continue
+
+    if yt is None:
+        if last_err:
+            raise last_err
+        raise RuntimeError("Unable to extract video details.")
 
     video_streams = []
     audio_streams = []
