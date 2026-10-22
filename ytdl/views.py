@@ -2,10 +2,12 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from pytubefix import YouTube
 from .forms import DownloadForm
+import io
 import os
 import re
 import http.cookiejar
 import urllib.request
+import yt_dlp
 from django.conf import settings
 
 DEFAULT_COOKIES = """# Netscape HTTP Cookie File
@@ -26,42 +28,63 @@ DEFAULT_COOKIES = """# Netscape HTTP Cookie File
 """
 
 _COOKIES_INITIALIZED = False
+_ACTIVE_COOKIE_PATH = "/tmp/cookies.txt"
 
 
 def setup_cookies():
-    global _COOKIES_INITIALIZED
+    global _COOKIES_INITIALIZED, _ACTIVE_COOKIE_PATH
     if _COOKIES_INITIALIZED:
-        return
+        return _ACTIVE_COOKIE_PATH
 
     cookie_candidates = [
-        getattr(settings, "BASE_DIR", "") and os.path.join(settings.BASE_DIR, "cookies.txt"),
+        getattr(settings, "BASE_DIR", "") and os.path.join(str(settings.BASE_DIR), "cookies.txt"),
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt"),
         "/var/www/YouTube-Downloader/cookies.txt",
         "/tmp/cookies.txt",
     ]
-    cookie_path = None
+
+    disk_path = None
     for p in cookie_candidates:
         if p and os.path.exists(p) and os.path.getsize(p) > 10:
-            cookie_path = p
+            disk_path = p
             break
 
-    if not cookie_path:
-        cookie_path = "/tmp/cookies.txt"
-        try:
-            with open(cookie_path, "w", encoding="utf-8") as f:
-                f.write(DEFAULT_COOKIES.strip() + "\n")
-        except Exception:
-            pass
+    # Ensure a world-readable fallback cookies file exists for yt-dlp
+    tmp_path = "/tmp/cookies.txt"
+    try:
+        if disk_path and disk_path != tmp_path:
+            with open(disk_path, "r", encoding="utf-8", errors="ignore") as src:
+                content = src.read()
+        else:
+            content = DEFAULT_COOKIES
 
-    if cookie_path and os.path.exists(cookie_path):
-        try:
-            cj = http.cookiejar.MozillaCookieJar(cookie_path)
-            cj.load(ignore_discard=True, ignore_expires=True)
-            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-            urllib.request.install_opener(opener)
-            _COOKIES_INITIALIZED = True
-        except Exception as e:
-            print("Cookie setup exception:", e)
+        with open(tmp_path, "w", encoding="utf-8") as dst:
+            dst.write(content.strip() + "\n")
+        os.chmod(tmp_path, 0o666)
+        _ACTIVE_COOKIE_PATH = tmp_path
+    except Exception:
+        _ACTIVE_COOKIE_PATH = disk_path or tmp_path
+
+    # Configure Python's global urllib opener with the cookies (both in-memory and disk)
+    try:
+        cj = http.cookiejar.MozillaCookieJar()
+        # Load from in-memory string first (guarantees valid cookies even without disk permissions)
+        cj._really_load(io.StringIO(DEFAULT_COOKIES), "memory.txt", ignore_discard=True, ignore_expires=True)
+
+        # If disk file exists, merge from it as well
+        if disk_path and os.path.exists(disk_path):
+            try:
+                cj.load(disk_path, ignore_discard=True, ignore_expires=True)
+            except Exception:
+                pass
+
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        urllib.request.install_opener(opener)
+        _COOKIES_INITIALIZED = True
+    except Exception as e:
+        print("Cookie setup warning:", e)
+
+    return _ACTIVE_COOKIE_PATH
 
 
 def is_valid_youtube_url(video_url):
@@ -74,21 +97,19 @@ def is_valid_youtube_url(video_url):
     return re.match(pattern, video_url.strip()) is not None
 
 
-def get_video_data(video_url):
+def extract_with_pytubefix(video_url):
     """
-    Extract YouTube video information using pytubefix.
-    Ensures authenticated session cookies are attached to bypass bot detection on datacenter IPs.
-    Tries multiple client profiles (WEB, ANDROID, MWEB, IOS, TV_EMBED) for maximum reliability.
+    Primary extraction engine using pytubefix.
+    Tries resilient client profiles: ANDROID_VR, WEB, ANDROID, MWEB, IOS.
+    Omits TV_EMBED and TV which YouTube no longer supports.
     """
-    setup_cookies()
     video_url = video_url.strip()
     yt = None
     last_err = None
 
-    for client_name in ["WEB", "ANDROID", "MWEB", "IOS", "TV_EMBED"]:
+    for client_name in ["ANDROID_VR", "WEB", "ANDROID", "MWEB", "IOS"]:
         try:
             candidate_yt = YouTube(video_url, client=client_name)
-            # test stream access to ensure signatures decrypt properly
             _ = candidate_yt.streams
             yt = candidate_yt
             break
@@ -97,9 +118,7 @@ def get_video_data(video_url):
             continue
 
     if yt is None:
-        if last_err:
-            raise last_err
-        raise RuntimeError("Unable to extract video details.")
+        raise last_err or RuntimeError("Pytubefix could not extract video.")
 
     video_streams = []
     audio_streams = []
@@ -166,7 +185,7 @@ def get_video_data(video_url):
         except Exception:
             views = "0"
 
-    context = {
+    return {
         "title": getattr(yt, "title", "Unknown Title") or "Unknown Title",
         "author": getattr(yt, "author", "") or "",
         "streams": video_streams,
@@ -178,7 +197,130 @@ def get_video_data(video_url):
         "duration": duration,
         "views": views,
     }
-    return context
+
+
+def extract_with_ytdlp(video_url, cookie_path):
+    """
+    Fallback extraction engine using yt-dlp with authenticated cookies.
+    """
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "source_address": "0.0.0.0",
+        "cachedir": False,
+    }
+    if cookie_path and os.path.exists(cookie_path):
+        ydl_opts["cookiefile"] = cookie_path
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        meta = ydl.extract_info(video_url, download=False)
+
+    raw_formats = meta.get("formats", [])
+    video_streams = []
+    audio_streams = []
+    seen_video_keys = set()
+    seen_audio_keys = set()
+
+    for m in raw_formats:
+        if m.get("ext") == "mhtml" or m.get("format_note") == "storyboard":
+            continue
+        vurl = m.get("url", "")
+        if not vurl:
+            continue
+
+        file_size = m.get("filesize") or m.get("filesize_approx")
+        if file_size:
+            try:
+                file_size_str = f"{round(int(file_size) / (1024 * 1024), 2)} MB"
+            except Exception:
+                file_size_str = "Unknown"
+        else:
+            file_size_str = "Unknown"
+
+        height = m.get("height")
+        width = m.get("width")
+        ext = m.get("ext", "mp4")
+        vcodec = m.get("vcodec", "none")
+        acodec = m.get("acodec", "none")
+
+        is_video = vcodec and vcodec != "none"
+        is_audio = (not vcodec or vcodec == "none") and acodec and acodec != "none"
+
+        if is_video:
+            resolution = f"{height}p" if height else (f"{width}w" if width else "Video")
+            key = (resolution, ext)
+            if key not in seen_video_keys:
+                seen_video_keys.add(key)
+                video_streams.append({
+                    "resolution": resolution,
+                    "height": height or 0,
+                    "extension": ext,
+                    "file_size": file_size_str,
+                    "video_url": vurl,
+                })
+        elif is_audio:
+            abr = m.get("abr") or 0
+            key = (ext, abr)
+            if key not in seen_audio_keys:
+                seen_audio_keys.add(key)
+                audio_streams.append({
+                    "extension": ext,
+                    "file_size": file_size_str,
+                    "video_url": vurl,
+                })
+
+    video_streams.sort(key=lambda s: s.get("height", 0), reverse=True)
+
+    duration = meta.get("duration") or 0
+    try:
+        duration = round(int(duration) / 60, 2)
+    except Exception:
+        duration = 0
+
+    view_count = meta.get("view_count", 0)
+    try:
+        views = f"{int(view_count):,}"
+    except Exception:
+        views = "0"
+
+    return {
+        "title": meta.get("title", "Unknown Title"),
+        "author": meta.get("uploader", ""),
+        "streams": video_streams,
+        "stream_audio": audio_streams,
+        "description": meta.get("description", ""),
+        "likes": meta.get("like_count", 0),
+        "dislikes": meta.get("dislike_count", 0),
+        "thumb": meta.get("thumbnail", ""),
+        "duration": duration,
+        "views": views,
+    }
+
+
+def get_video_data(video_url):
+    """
+    Extract YouTube video information.
+    First tries pytubefix (with in-memory/disk cookies and multi-client fallback).
+    If that fails, automatically falls back to yt-dlp with authenticated cookies.
+    """
+    cookie_path = setup_cookies()
+    errors = []
+
+    # 1. Try pytubefix
+    try:
+        return extract_with_pytubefix(video_url)
+    except Exception as e:
+        print("Pytubefix extraction failed:", e)
+        errors.append(f"Pytubefix: {e}")
+
+    # 2. Try yt-dlp fallback
+    try:
+        return extract_with_ytdlp(video_url, cookie_path)
+    except Exception as e:
+        print("yt-dlp extraction failed:", e)
+        errors.append(f"yt-dlp: {e}")
+
+    raise RuntimeError(" | ".join(errors))
 
 
 def download_video(request):
