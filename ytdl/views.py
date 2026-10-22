@@ -201,13 +201,15 @@ def extract_with_pytubefix(video_url):
 
 def extract_with_ytdlp(video_url, cookie_path):
     """
-    Fallback extraction engine using yt-dlp with authenticated cookies and multi-client strategies.
+    Fallback extraction engine using yt-dlp with authenticated cookies,
+    multi-client strategies, and geo-bypass handling for regional restrictions.
     """
-    ydl_opts = {
+    base_opts = {
         "quiet": True,
         "no_warnings": True,
         "source_address": "0.0.0.0",
         "cachedir": False,
+        "geo_bypass": True,
         "extractor_args": {
             "youtube": {
                 "player_client": ["mweb", "android", "web", "ios", "tv"]
@@ -215,10 +217,35 @@ def extract_with_ytdlp(video_url, cookie_path):
         },
     }
     if cookie_path and os.path.exists(cookie_path):
-        ydl_opts["cookiefile"] = cookie_path
+        base_opts["cookiefile"] = cookie_path
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        meta = ydl.extract_info(video_url, download=False)
+    meta = None
+    last_err = None
+
+    # First attempt: standard geo-bypass
+    try:
+        with yt_dlp.YoutubeDL(base_opts) as ydl:
+            meta = ydl.extract_info(video_url, download=False)
+    except Exception as e:
+        last_err = e
+        err_msg = str(e).lower()
+
+        # If geographically restricted, attempt rotating through common regional bypass countries
+        if "available in your country" in err_msg or "country" in err_msg or "unavailable" in err_msg:
+            for country in ["IN", "US", "GB", "DE", "JP", "CA", "AU"]:
+                try:
+                    retry_opts = dict(base_opts)
+                    retry_opts["geo_bypass_country"] = country
+                    with yt_dlp.YoutubeDL(retry_opts) as ydl:
+                        meta = ydl.extract_info(video_url, download=False)
+                    if meta:
+                        break
+                except Exception as inner_e:
+                    last_err = inner_e
+                    continue
+
+    if not meta:
+        raise last_err or RuntimeError("yt-dlp could not extract video.")
 
     raw_formats = meta.get("formats", [])
     video_streams = []
