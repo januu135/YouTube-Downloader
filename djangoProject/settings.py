@@ -30,6 +30,16 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.up.railway.app',
+    'https://*.onrender.com',
+    'https://*.herokuapp.com',
+    'http://*.up.railway.app',
+    'http://*.onrender.com',
+    'http://*.herokuapp.com',
+]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 
