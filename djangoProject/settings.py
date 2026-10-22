@@ -30,6 +30,8 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
+# Allow any custom domain or subdomains configured via environment variable, or wildcard for production
+DOMAIN_HOST = os.environ.get('DOMAIN_NAME', '')
 CSRF_TRUSTED_ORIGINS = [
     'https://*.up.railway.app',
     'https://*.onrender.com',
@@ -38,6 +40,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://*.onrender.com',
     'http://*.herokuapp.com',
 ]
+if DOMAIN_HOST:
+    for prefix in ['https://', 'http://']:
+        CSRF_TRUSTED_ORIGINS.append(f"{prefix}{DOMAIN_HOST}")
+        CSRF_TRUSTED_ORIGINS.append(f"{prefix}*.{DOMAIN_HOST}")
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
