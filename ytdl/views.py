@@ -100,14 +100,14 @@ def is_valid_youtube_url(video_url):
 def extract_with_pytubefix(video_url):
     """
     Primary extraction engine using pytubefix.
-    Tries resilient client profiles: ANDROID_VR, WEB, ANDROID, MWEB, IOS.
+    Tries resilient client profiles: VISION_OS, ANDROID_VR, ANDROID, IOS, MWEB, WEB.
     Omits TV_EMBED and TV which YouTube no longer supports.
     """
     video_url = video_url.strip()
     yt = None
     last_err = None
 
-    for client_name in ["ANDROID_VR", "WEB", "ANDROID", "MWEB", "IOS"]:
+    for client_name in ["VISION_OS", "ANDROID_VR", "ANDROID", "IOS", "MWEB", "WEB"]:
         try:
             candidate_yt = YouTube(video_url, client=client_name)
             _ = candidate_yt.streams
@@ -201,13 +201,18 @@ def extract_with_pytubefix(video_url):
 
 def extract_with_ytdlp(video_url, cookie_path):
     """
-    Fallback extraction engine using yt-dlp with authenticated cookies.
+    Fallback extraction engine using yt-dlp with authenticated cookies and multi-client strategies.
     """
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "source_address": "0.0.0.0",
         "cachedir": False,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb", "android", "web", "ios", "tv"]
+            }
+        },
     }
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts["cookiefile"] = cookie_path
