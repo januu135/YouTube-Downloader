@@ -1,28 +1,25 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block content %}
-   <html>
-    <head>
+    <header>
         <h1>YouTube Video Downloader</h1>
         <nav>
-            <a href="{%url 'download_video'%}">Home </a>
+            <a href="{% url 'download_video' %}">Home</a>
             <a href="#">Contact</a>
             <a href="#">Privacy Policy</a>
             <div class="dropdown">
-                <button>Languages</button>
+                <button type="button">Languages</button>
                 <div class="dropdown-options">
-                  <a href="{%url 'download_video'%}">English</a>
-                  <a href="{%url 'br'%}">Brazil</a>
-                  <a href="{%url 'fr'%}">France</a>
-                  <a href="{%url 'id'%}">Indonesia</a>
+                    <a href="{% url 'download_video' %}">English</a>
+                    <a href="{% url 'br' %}">Brazil</a>
+                    <a href="{% url 'fr' %}">France</a>
+                    <a href="{% url 'id' %}">Indonesia</a>
                 </div>
-              </div>
-            
+            </div>
         </nav>
-   
-    </head>
-    <body>       
+    </header>
 
     <div class="background">
         <div class="title">
@@ -41,18 +38,16 @@
     {% if title %}
         <div class="dbox">
             <div class="img-thumb">
-                <img class="img-responsive" src="{{ thumb }}">
+                <img class="img-responsive" src="{{ thumb }}" alt="{{ title }}">
             </div>
             <div id="desl" class="v-about">
                 <p class="v-title">{{ title }}</p>
-                <section class="infos">
-
+                <ul class="infos">
                     <li>Duration <b>{{ duration }}</b></li>
                     <li>Views <b>{{ views }}</b></li>
                     <li>Likes <b>{{ likes }}</b></li>
-                    <li>Dislikes <b>{{ dislikes }}</b</li>
-
-                </section>
+                    <li>Dislikes <b>{{ dislikes }}</b></li>
+                </ul>
             </div>
         </div>
 
@@ -60,88 +55,71 @@
             <p class="v-title">{{ title }}</p>
         </div>
         <div class="downloads">
-
             <table>
-                <tr>
-                    <th scope="col">Resolution</th>
-                    <th scope="col">File Size</th>
-                    <th scope="col">Extension</th>
-                    <th scope="col">Download</th>
-                </tr>
-                <tr>
+                <thead>
+                    <tr>
+                        <th scope="col">Resolution</th>
+                        <th scope="col">File Size</th>
+                        <th scope="col">Extension</th>
+                        <th scope="col">Download</th>
+                    </tr>
+                </thead>
+                <tbody>
                     {% for stream in streams %}
                         <tr>
                             <td>{{ stream.resolution }}</td>
                             <td>{{ stream.file_size }}</td>
                             <td>{{ stream.extension }}</td>
                             <td><a href="{{ stream.video_url }}" style="text-decoration: none;"
-                                   download="{{ title }}.{{ extension }}" target="_blank">Download <i
-                                    class=" fa fa-download"></i></a></td>
+                                   download="{{ title }}.{{ stream.extension }}" target="_blank">Download <i
+                                    class="fa fa-download"></i></a></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" style="text-align: center;">No video streams available.</td>
                         </tr>
                     {% endfor %}
-                </tr>
+                </tbody>
             </table>
 
             <p class="h3 text-center mt-5 mb-5">Audio Only</p>
             <table class="table mt-5 mb-5">
                 <thead class="thead-light">
-                <tr>
-                    <th scope="col">File Size</th>
-                    <th scope="col">Extension</th>
-                    <th scope="col">Download</th>
-                </tr>
+                    <tr>
+                        <th scope="col">File Size</th>
+                        <th scope="col">Extension</th>
+                        <th scope="col">Download</th>
+                    </tr>
                 </thead>
                 <tbody>
-                {% for stream in stream_audio %}
-                    <tr>
-                        <td>{{ stream.file_size }}</td>
-                        <td>{{ stream.extension }}</td>
-                        <td><a href="{{ stream.video_url }}" style="text-decoration: none;"
-                               download="{{ title }}.{{ extension }}" target="_blank">Download <i
-                                class=" fa fa-download"></i></a></td>
-                    </tr>
-                {% endfor %}
+                    {% for stream in stream_audio %}
+                        <tr>
+                            <td>{{ stream.file_size }}</td>
+                            <td>{{ stream.extension }}</td>
+                            <td><a href="{{ stream.video_url }}" style="text-decoration: none;"
+                                   download="{{ title }}.{{ stream.extension }}" target="_blank">Download <i
+                                    class="fa fa-download"></i></a></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" style="text-align: center;">No audio streams available.</td>
+                        </tr>
+                    {% endfor %}
                 </tbody>
             </table>
-
-            {##}
-            {#            <p class="h3 text-center mt-5 mb-5">Video Only</p>#}
-            {#            <table class="table mt-5">#}
-            {#                <thead class="thead-light">#}
-            {#                <tr>#}
-            {#                    <th scope="col">Resolution</th>#}
-            {#                    <th scope="col">File Size</th>#}
-            {#                    <th scope="col">Extension</th>#}
-            {#                    <th scope="col" >Download</th>#}
-            {#                </tr>#}
-            {#                </thead>#}
-            {#                <tbody>#}
-            {#                {% for stream in stream_video %}#}
-            {#                    <tr>#}
-            {#                        <td>{{ stream.resolution }}</td>#}
-            {#                        <td>{{ stream.file_size }}</td>#}
-            {#                        <td>{{ stream.extension }}</td>#}
-            {#                        <td><a href="{{ stream.video_url }}" style="text-decoration: none;"#}
-            {#                               download="{{ title }}.{{ extension }}" target="_blank">Download <i#}
-            {#                                class=" fa fa-download"></i></a></td>#}
-            {#                    </tr>#}
-            {#                {% endfor %}#}
-            {#                </tbody>#}
-            {#            </table>#}
-            {##}
         </div>
-
     {% endif %}
+
     <br>
     <section>
         <div class="container2">
             <h2>Quais são as etapas para baixar vídeos do YouTube no telefone?</h2>
-            <P>Baixe vídeos do YouTube em seu telefone simplesmente colando o link no Y2mate e salvando-o.Passos que você deve seguir:</P>
-            <p>1: Baixe vídeos do YouTube em seu telefone simplesmente colando o link no Y2mate e salvando-o.Passos que você deve seguir:
+            <p>Baixe vídeos do YouTube em seu telefone simplesmente colando o link no Y2mate e salvando-o. Passos que você deve seguir:</p>
+            <p>1: Baixe vídeos do YouTube em seu telefone simplesmente colando o link no Y2mate e salvando-o. Passos que você deve seguir:
             </p>
             <p>2: Clique no botão Compartilhar abaixo do vídeo e selecione o link Copiar.
             </p>
-            IMAGES
+            <img src="{% static 'YouTube-Downloader/images/1.webp' %}" alt="Passo 1">
             <p>3: Acesse y2-mate.net usando o navegador do seu telefone.
             </p>
             <p>
@@ -151,9 +129,9 @@
                 5: Após colar o link, você obterá vídeos nas resoluções e formatos de saída disponíveis.
             </p>
             <p>
-                6:Toque no botão Download para salvar o vídeo na resolução desejada.
+                6: Toque no botão Download para salvar o vídeo na resolução desejada.
             </p>
-            IMAGES
+            <img src="{% static 'YouTube-Downloader/images/1.webp' %}" alt="Passo 2">
             <p>7: Dependendo do tamanho do arquivo, o vídeo deve ser salvo no seu telefone em alguns segundos ou minutos.
             </p>
             <h2>Quais são as etapas para baixar vídeos do YouTube em um PC?</h2>
@@ -163,25 +141,25 @@
             </p>
             <p>2: Na barra de endereço do seu navegador, copie o link do vídeo.
             </p>
-            IMAGES
+            <img src="{% static 'YouTube-Downloader/images/1.webp' %}" alt="Passo 3">
             <p> 3: Use a caixa de pesquisa no topo desta página para inserir o link no Y2mate.
             </p>
             <p>4: Uma busca pelo vídeo será iniciada automaticamente pelo Y2mate. Em alguns segundos, você obterá os resultados.
             </p>
-            IMAGES
+            <img src="{% static 'YouTube-Downloader/images/1.webp' %}" alt="Passo 4">
             <p>5: Clique no botão Baixar e salve.
-            </P>
+            </p>
             <p>
                 6: Você pode visualizar o vídeo do YouTube em seu computador após baixá-lo.
             </p>
-            IMAGES
+            <img src="{% static 'YouTube-Downloader/images/1.webp' %}" alt="Passo 5">
         </div>
-       </section>
-       <footer class="footer">
+    </section>
+
+    <footer class="footer">
         <div class="container1">
             <div class="row">
                 <div class="footer-col">
-                    
                     <ul>
                         <li><a href="#">y2-mate.net</a></li>
                         <li><a href="#">Youtube Downloader</a></li>
@@ -190,42 +168,35 @@
                     </ul>
                 </div>
                 <div class="footer-col">
-                    
                     <ul>
-                        <li><a href="{%url 'download_video'%}">English</a></li>
-                        <li><a href="{%url 'br'%}">Brazil </a></li>
-                        <li><a href="{%url 'fr'%}">France </a></li>
-                        <li><a href="{%url 'id'%}">Indonesia</a></li>
+                        <li><a href="{% url 'download_video' %}">English</a></li>
+                        <li><a href="{% url 'br' %}">Brazil</a></li>
+                        <li><a href="{% url 'fr' %}">France</a></li>
+                        <li><a href="{% url 'id' %}">Indonesia</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">
-                    
                     <ul>
                         <li><a href="#">About Us</a></li>
-                        <li><a href="#">Contact </a></li>
+                        <li><a href="#">Contact</a></li>
                         <li><a href="#">Terms of Service</a></li>
                         <li><a href="#">Privacy Policy</a></li>
                     </ul>
                 </div>
-                
             </div>
-            
         </div>
         <br>
         <br>
         <div class="container">
             <p style="text-align: center; color: white;">© Copyright 2023 by y2-mate.net</p>
         </div>
-   </footer>
-   
- 
+    </footer>
 
+    <script>
+        $(function(){
+            if ($.fn.selectpicker) {
+                $('.selectpicker').selectpicker();
+            }
+        });
+    </script>
 {% endblock %}
-<script>
-    $(function(){
-    $('.selectpicker').selectpicker();
-});
-</script>
-
-</body>
-</html>
