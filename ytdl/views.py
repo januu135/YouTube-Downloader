@@ -103,14 +103,14 @@ def is_valid_youtube_url(video_url):
 def extract_with_pytubefix(video_url):
     """
     Primary extraction engine using pytubefix.
-    Tries resilient client profiles: VISION_OS, ANDROID_VR, ANDROID, IOS, MWEB, WEB.
-    Omits TV_EMBED and TV which YouTube no longer supports.
+    Tries resilient client profiles: ANDROID, VISION_OS, ANDROID_VR, IOS, MWEB, WEB.
+    ANDROID and VISION_OS avoid YouTube's bot detection on datacenter/VPS IPs.
     """
     video_url = video_url.strip()
     yt = None
     last_err = None
 
-    for client_name in ["VISION_OS", "ANDROID_VR", "ANDROID", "IOS", "MWEB", "WEB"]:
+    for client_name in ["ANDROID", "VISION_OS", "ANDROID_VR", "IOS", "MWEB", "WEB"]:
         try:
             candidate_yt = YouTube(video_url, client=client_name)
             _ = candidate_yt.streams
@@ -204,48 +204,73 @@ def extract_with_pytubefix(video_url):
 
 def extract_with_ytdlp(video_url, cookie_path):
     """
-    Fallback extraction engine using yt-dlp with authenticated cookies,
-    multi-client strategies, and geo-bypass handling for regional restrictions.
+    Fallback extraction engine using yt-dlp with multi-client strategies,
+    authenticated cookies fallback, and clean unauthenticated retries.
     """
-    base_opts = {
+    meta = None
+    last_err = None
+
+    # Try strategies:
+    # 1. With cookies (if available) + default/embedded clients
+    # 2. Without cookies (clean unauthenticated mobile/android/ios) if cookies are flagged/expired
+    # 3. Geo-bypass country rotations
+    strategies = []
+
+    has_cookies = cookie_path and os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 10
+    if has_cookies:
+        strategies.append({
+            "cookiefile": cookie_path,
+            "geo_bypass": True,
+        })
+        strategies.append({
+            "cookiefile": cookie_path,
+            "geo_bypass": True,
+            "extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb", "web"]}},
+        })
+
+    # Clean unauthenticated strategies (vital when cookies expire or trigger bot detection)
+    strategies.append({
+        "geo_bypass": True,
+    })
+    strategies.append({
+        "geo_bypass": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb", "web"]}},
+    })
+
+    common_opts = {
         "quiet": True,
         "no_warnings": True,
         "source_address": "0.0.0.0",
         "cachedir": False,
-        "geo_bypass": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["mweb", "android", "web", "ios", "tv"]
-            }
-        },
     }
-    if cookie_path and os.path.exists(cookie_path):
-        base_opts["cookiefile"] = cookie_path
 
-    meta = None
-    last_err = None
-
-    # First attempt: standard geo-bypass
-    try:
-        with yt_dlp.YoutubeDL(base_opts) as ydl:
-            meta = ydl.extract_info(video_url, download=False)
-    except Exception as e:
-        last_err = e
-        err_msg = str(e).lower()
-
-        # If geographically restricted, attempt rotating through common regional bypass countries
-        if "available in your country" in err_msg or "country" in err_msg or "unavailable" in err_msg:
-            for country in ["IN", "US", "GB", "DE", "JP", "CA", "AU"]:
-                try:
-                    retry_opts = dict(base_opts)
-                    retry_opts["geo_bypass_country"] = country
-                    with yt_dlp.YoutubeDL(retry_opts) as ydl:
-                        meta = ydl.extract_info(video_url, download=False)
-                    if meta:
-                        break
-                except Exception as inner_e:
-                    last_err = inner_e
-                    continue
+    for strat in strategies:
+        try:
+            opts = dict(common_opts)
+            opts.update(strat)
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                meta = ydl.extract_info(video_url, download=False)
+            if meta and meta.get("formats"):
+                break
+        except Exception as e:
+            last_err = e
+            err_msg = str(e).lower()
+            # If region-restricted, try geo-bypass rotation
+            if "available in your country" in err_msg or "country" in err_msg or "unavailable" in err_msg:
+                for country in ["IN", "US", "GB", "DE", "JP", "CA", "AU"]:
+                    try:
+                        retry_opts = dict(common_opts)
+                        retry_opts.update(strat)
+                        retry_opts["geo_bypass_country"] = country
+                        with yt_dlp.YoutubeDL(retry_opts) as ydl:
+                            meta = ydl.extract_info(video_url, download=False)
+                        if meta and meta.get("formats"):
+                            break
+                    except Exception as inner_e:
+                        last_err = inner_e
+                        continue
+                if meta and meta.get("formats"):
+                    break
 
     if not meta:
         raise last_err or RuntimeError("yt-dlp could not extract video.")
