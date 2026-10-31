@@ -103,14 +103,25 @@ def is_valid_youtube_url(video_url):
 def extract_with_pytubefix(video_url):
     """
     Primary extraction engine using pytubefix.
-    Tries resilient client profiles: ANDROID, VISION_OS, ANDROID_VR, IOS, MWEB, WEB.
-    ANDROID and VISION_OS avoid YouTube's bot detection on datacenter/VPS IPs.
+    Cycles through resilient client profiles:
+    TV, TV_EMBED, WEB_EMBED, ANDROID, IOS, MWEB, WEB.
+    Prioritizing TV and embedded profiles avoids SABR forced-ad checkpoints.
     """
     video_url = video_url.strip()
     yt = None
     last_err = None
 
-    for client_name in ["ANDROID", "VISION_OS", "ANDROID_VR", "IOS", "MWEB", "WEB"]:
+    client_candidates = [
+        "TV",
+        "TV_EMBED",
+        "WEB_EMBED",
+        "ANDROID",
+        "IOS",
+        "MWEB",
+        "WEB",
+    ]
+
+    for client_name in client_candidates:
         try:
             candidate_yt = YouTube(video_url, client=client_name)
             _ = candidate_yt.streams
@@ -206,14 +217,14 @@ def extract_with_ytdlp(video_url, cookie_path):
     """
     Fallback extraction engine using yt-dlp with multi-client strategies,
     authenticated cookies fallback, and clean unauthenticated retries.
+    Uses player_client and player_skip optimizations to bypass SABR ad checkpoints.
     """
     meta = None
     last_err = None
 
     # Try strategies:
-    # 1. With cookies (if available) + default/embedded clients
-    # 2. Without cookies (clean unauthenticated mobile/android/ios) if cookies are flagged/expired
-    # 3. Geo-bypass country rotations
+    # Prioritize clients (tv, tv_embedded, mweb, android, ios) and skip webpage/configs
+    # which circumvents YouTube's forced ad insertions and SABR reload errors.
     strategies = []
 
     has_cookies = cookie_path and os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 10
@@ -221,20 +232,39 @@ def extract_with_ytdlp(video_url, cookie_path):
         strategies.append({
             "cookiefile": cookie_path,
             "geo_bypass": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv", "tv_embedded", "mweb", "android", "ios", "web_embedded"],
+                    "player_skip": ["webpage", "configs"],
+                }
+            },
         })
         strategies.append({
             "cookiefile": cookie_path,
             "geo_bypass": True,
             "extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb", "web"]}},
         })
+        strategies.append({
+            "cookiefile": cookie_path,
+            "geo_bypass": True,
+        })
 
     # Clean unauthenticated strategies (vital when cookies expire or trigger bot detection)
     strategies.append({
         "geo_bypass": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv", "tv_embedded", "mweb", "android", "ios", "web_embedded"],
+                "player_skip": ["webpage", "configs"],
+            }
+        },
     })
     strategies.append({
         "geo_bypass": True,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb", "web"]}},
+    })
+    strategies.append({
+        "geo_bypass": True,
     })
 
     common_opts = {
