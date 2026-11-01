@@ -46,6 +46,7 @@ def extract_with_ytdlp(video_url):
     on monetized and ad-bearing videos.
     """
     cookie_path = get_cookie_file()
+    print(f"[yt-dlp] Cookie file detected: {cookie_path}")
     last_err = None
 
     base_strategies = [
@@ -100,6 +101,7 @@ def extract_with_ytdlp(video_url):
         "skip_download": True,
         "nocheckcertificate": True,
         "cachedir": False,
+        "socket_timeout": 8,
     }
 
     meta = None
@@ -114,8 +116,8 @@ def extract_with_ytdlp(video_url):
         except Exception as e:
             last_err = e
             err_msg = str(e).lower()
-            if "available in your country" in err_msg or "country" in err_msg or "unavailable" in err_msg:
-                for country in ["US", "GB", "DE", "IN", "JP", "CA", "AU"]:
+            if ("not available in your country" in err_msg or "blocked it in your country" in err_msg) and "152" not in err_msg:
+                for country in ["US", "GB", "DE", "IN"]:
                     try:
                         retry_opts = dict(common_opts)
                         retry_opts.update(strat)
