@@ -5,11 +5,29 @@ import os
 import re
 import yt_dlp
 from django.conf import settings
+from django.core.cache import cache
 
 try:
     from pytubefix import YouTube
 except ImportError:
     YouTube = None
+
+
+def extract_video_id(video_url):
+    """
+    Extract canonical 11-char YouTube video ID.
+    Supports youtu.be, youtube.com/watch?v=, youtube.com/shorts/, youtube.com/embed/, etc.
+    """
+    if not video_url:
+        return None
+    patterns = [
+        r"(?:v=|/v/|youtu\.be/|/embed/|/shorts/)([a-zA-Z0-9_-]{11})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, video_url.strip())
+        if match:
+            return match.group(1)
+    return None
 
 
 def is_valid_youtube_url(video_url):
@@ -102,6 +120,12 @@ def extract_with_ytdlp(video_url):
         "nocheckcertificate": True,
         "cachedir": False,
         "socket_timeout": 8,
+        "getcomments": False,
+        "writesubtitles": False,
+        "writeautomaticsub": False,
+        "extract_flat": False,
+        "lazy_playlist": True,
+        "no_color": True,
     }
 
     meta = None
@@ -343,22 +367,37 @@ def extract_with_pytubefix(video_url):
 
 def get_video_data(video_url):
     """
-    Extract YouTube video information.
+    Extract YouTube video information with in-memory caching and URL normalization.
     Prioritizes yt-dlp which reliably handles monetized and ad-bearing videos.
     Falls back to pytubefix if needed.
     """
+    video_id = extract_video_id(video_url)
+    cache_key = f"yt_meta_{video_id}" if video_id else None
+    if cache_key:
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            print(f"[Cache Hit] Returning cached metadata for video ID: {video_id}")
+            return dict(cached_data)
+
+    clean_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else video_url.strip()
     errors = []
 
     # 1. Primary: yt-dlp with multi-client & ad-bypass strategies
     try:
-        return extract_with_ytdlp(video_url)
+        data = extract_with_ytdlp(clean_url)
+        if cache_key and data:
+            cache.set(cache_key, data, timeout=1800)
+        return data
     except Exception as e:
         print("yt-dlp extraction failed:", e)
         errors.append(f"yt-dlp: {e}")
 
     # 2. Fallback: pytubefix
     try:
-        return extract_with_pytubefix(video_url)
+        data = extract_with_pytubefix(clean_url)
+        if cache_key and data:
+            cache.set(cache_key, data, timeout=1800)
+        return data
     except Exception as e:
         print("pytubefix extraction failed:", e)
         errors.append(f"pytubefix: {e}")

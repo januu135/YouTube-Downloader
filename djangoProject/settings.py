@@ -167,3 +167,14 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 # SECURE_HSTS_SECONDS             = None
 # SECURE_HSTS_INCLUDE_SUBDOMAINS  = False
 # SECURE_FRAME_DENY               = False
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'yt-dl-cache',
+        'TIMEOUT': 1800,
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,
+        }
+    }
+}
