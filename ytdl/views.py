@@ -1,5 +1,8 @@
 from django.shortcuts import render
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import HttpResponse, FileResponse, StreamingHttpResponse
+import tempfile
+import glob
+import time
 import sys
 import subprocess
 import requests
@@ -501,11 +504,30 @@ def id(request):
     return render(request, "id.html", {"form": form})
 
 
+DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), 'ytdl_downloads')
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+
+def cleanup_old_downloads():
+    """Clean up files in DOWNLOAD_DIR older than 1 hour to prevent disk bloat."""
+    try:
+        now = time.time()
+        for f in os.listdir(DOWNLOAD_DIR):
+            fpath = os.path.join(DOWNLOAD_DIR, f)
+            if os.path.isfile(fpath) and (now - os.path.getmtime(fpath)) > 3600:
+                try:
+                    os.remove(fpath)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 def convert_to_mp3(request):
     """
-    On-the-fly MP3 conversion using yt-dlp piped directly into FFmpeg.
-    yt-dlp authenticates with cookies.txt and streams audio bytes to stdout.
-    FFmpeg encodes the audio stream into true MP3 (libmp3lame) piped to the user.
+    Direct MP3 conversion using yt-dlp native audio extraction.
+    Downloads, merges, and converts using FFmpeg on disk to ensure valid headers,
+    then serves complete, non-corrupt MP3 with FileResponse.
     """
     video_id = request.GET.get('v')
     title = request.GET.get('title', 'audio')
@@ -514,63 +536,50 @@ def convert_to_mp3(request):
     if not video_id:
         return HttpResponse("Missing video id parameter 'v'", status=400)
 
+    cleanup_old_downloads()
+
     cookie_path = get_cookie_file()
     safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'audio'
     video_url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    target_pattern = os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}.mp3")
 
-    # Build yt-dlp command to stream best audio to stdout
-    ytdl_cmd = [
-        sys.executable, '-m', 'yt_dlp',
-        '--no-warnings',
-        '--quiet',
-        '-f', 'ba/b',
-        '-o', '-',
-    ]
-    if cookie_path:
-        ytdl_cmd.extend(['--cookies', cookie_path])
-    ytdl_cmd.append(video_url)
+    if not os.path.exists(target_pattern) or os.path.getsize(target_pattern) < 1000:
+        ytdl_cmd = [
+            sys.executable, '-m', 'yt_dlp',
+            '--no-warnings',
+            '--quiet',
+            '-x',
+            '--audio-format', 'mp3',
+            '--audio-quality', abr,
+            '-o', os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}.%(ext)s"),
+        ]
+        if cookie_path:
+            ytdl_cmd.extend(['--cookies', cookie_path])
+        ytdl_cmd.append(video_url)
 
-    ffmpeg_cmd = [
-        'ffmpeg',
-        '-loglevel', 'error',
-        '-i', 'pipe:0',
-        '-vn',
-        '-acodec', 'libmp3lame',
-        '-b:a', abr,
-        '-f', 'mp3',
-        'pipe:1'
-    ]
-
-    try:
-        p_ytdl = subprocess.Popen(ytdl_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        p_ffmpeg = subprocess.Popen(ffmpeg_cmd, stdin=p_ytdl.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=64 * 1024)
-        p_ytdl.stdout.close()
-    except Exception as e:
-        return HttpResponse(f"Conversion error: {e}", status=500)
-
-    def file_iterator():
         try:
-            while True:
-                chunk = p_ffmpeg.stdout.read(64 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            if p_ffmpeg.poll() is None:
-                p_ffmpeg.terminate()
-            if p_ytdl.poll() is None:
-                p_ytdl.terminate()
+            res = subprocess.run(ytdl_cmd, capture_output=True, text=True, timeout=120)
+            if res.returncode != 0:
+                print(f"[yt-dlp MP3 error] {res.stderr}")
+                return HttpResponse(f"MP3 conversion error: {res.stderr or 'Failed to download'}", status=500)
+        except Exception as e:
+            return HttpResponse(f"Conversion error: {e}", status=500)
 
-    response = StreamingHttpResponse(file_iterator(), content_type='audio/mpeg')
-    response['Content-Disposition'] = f'attachment; filename="{safe_title}.mp3"'
-    return response
+    # Find the generated mp3 file
+    candidates = glob.glob(os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}*.mp3"))
+    if not candidates or os.path.getsize(candidates[0]) < 1000:
+        return HttpResponse("MP3 conversion failed (empty file generated)", status=500)
+
+    filepath = candidates[0]
+    return FileResponse(open(filepath, 'rb'), content_type='audio/mpeg', as_attachment=True, filename=f"{safe_title}.mp3")
 
 
 def download_stream(request):
     """
-    Direct video download streaming using yt-dlp piped to user.
-    yt-dlp authenticates with cookies, fetches the exact format, and streams
-    raw video bytes to stdout.
+    Direct video download using yt-dlp native download.
+    Downloads and finalizes MP4 container on disk with complete headers,
+    then serves full, playable video with FileResponse.
     """
     video_id = request.GET.get('v')
     fid = request.GET.get('fid')
@@ -580,41 +589,53 @@ def download_stream(request):
     if not video_id:
         return HttpResponse("Missing video id parameter 'v'", status=400)
 
+    cleanup_old_downloads()
+
     cookie_path = get_cookie_file()
     safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'video'
     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    # Use format_id if valid, else best progressive mp4
-    format_spec = fid if (fid and fid != 'None' and not fid.startswith('mp3')) else 'best[ext=mp4]/best'
+    fid_clean = re.sub(r'[^\w-]', '', fid) if fid else 'best'
+    target_base = os.path.join(DOWNLOAD_DIR, f"{video_id}_{fid_clean}")
+    
+    candidates = glob.glob(f"{target_base}.*")
+    valid_file = None
+    for c in candidates:
+        if os.path.exists(c) and os.path.getsize(c) > 5000:
+            valid_file = c
+            break
 
-    ytdl_cmd = [
-        sys.executable, '-m', 'yt_dlp',
-        '--no-warnings',
-        '--quiet',
-        '-f', format_spec,
-        '-o', '-',
-    ]
-    if cookie_path:
-        ytdl_cmd.extend(['--cookies', cookie_path])
-    ytdl_cmd.append(video_url)
+    if not valid_file:
+        format_spec = f"{fid}+ba/b[ext=mp4]/{fid}/best" if (fid and fid != 'None') else "best[ext=mp4]/best"
+        ytdl_cmd = [
+            sys.executable, '-m', 'yt_dlp',
+            '--no-warnings',
+            '--quiet',
+            '-f', format_spec,
+            '--merge-output-format', 'mp4',
+            '-o', f"{target_base}.%(ext)s",
+        ]
+        if cookie_path:
+            ytdl_cmd.extend(['--cookies', cookie_path])
+        ytdl_cmd.append(video_url)
 
-    try:
-        process = subprocess.Popen(ytdl_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=64 * 1024)
-    except Exception as e:
-        return HttpResponse(f"Streaming error: {e}", status=500)
-
-    def file_iterator():
         try:
-            while True:
-                chunk = process.stdout.read(64 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            if process.poll() is None:
-                process.terminate()
+            res = subprocess.run(ytdl_cmd, capture_output=True, text=True, timeout=120)
+            if res.returncode != 0:
+                print(f"[yt-dlp Video error] {res.stderr}")
+                return HttpResponse(f"Video download error: {res.stderr or 'Failed to download'}", status=500)
+        except Exception as e:
+            return HttpResponse(f"Streaming error: {e}", status=500)
 
-    content_type = f'video/{ext}' if ext != 'mp3' else 'audio/mpeg'
-    response = StreamingHttpResponse(file_iterator(), content_type=content_type)
-    response['Content-Disposition'] = f'attachment; filename="{safe_title}.{ext}"'
-    return response
+        candidates = glob.glob(f"{target_base}.*")
+        for c in candidates:
+            if os.path.exists(c) and os.path.getsize(c) > 5000:
+                valid_file = c
+                break
+
+    if not valid_file:
+        return HttpResponse("Video download failed (file could not be finalized)", status=500)
+
+    actual_ext = valid_file.split('.')[-1]
+    content_type = f'video/{actual_ext}' if actual_ext != 'mp3' else 'audio/mpeg'
+    return FileResponse(open(valid_file, 'rb'), content_type=content_type, as_attachment=True, filename=f"{safe_title}.{actual_ext}")
