@@ -551,10 +551,12 @@ def convert_to_mp3(request):
             '--quiet',
             '--geo-bypass',
             '--extractor-args', 'youtube:player_client=tv,tv_embedded,ios,mweb',
-            '-f', 'ba/ba*/18/b/best',
+            '--concurrent-fragments', '4',
+            '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/ba*/18/b/best',
             '-x',
             '--audio-format', 'mp3',
             '--audio-quality', abr,
+            '--postprocessor-args', 'ffmpeg:-threads 0',
             '-o', os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}.%(ext)s"),
         ]
         if cookie_path:
@@ -616,6 +618,7 @@ def download_stream(request):
             '--quiet',
             '--geo-bypass',
             '--extractor-args', 'youtube:player_client=tv,tv_embedded,ios,mweb',
+            '--concurrent-fragments', '4',
             '-f', format_spec,
             '--merge-output-format', 'mp4',
             '-o', f"{target_base}.%(ext)s",
