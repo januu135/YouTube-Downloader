@@ -898,3 +898,12 @@ footer.modern-footer {
     border-color: var(--primary) !important;
     animation: pulseGlow 1.2s infinite alternate !important;
 }
+
+.spinner-icon.spinner-only {
+    margin: 0 !important;
+    width: 18px;
+    height: 18px;
+    border-width: 2.5px;
+    display: inline-block;
+    vertical-align: middle;
+}

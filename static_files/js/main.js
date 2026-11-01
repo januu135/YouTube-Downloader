@@ -30,33 +30,32 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // 2. Table download buttons (MP3 / Video) loading state
+    // 2. Table download buttons (MP3 / Video) - Preloader without text, stays on page
     const downloadLinks = document.querySelectorAll('.btn-table-download');
     downloadLinks.forEach(function (link) {
-        link.addEventListener('click', function () {
-            if (this.classList.contains('is-loading')) return;
+        link.addEventListener('click', function (e) {
+            if (this.classList.contains('is-loading')) {
+                e.preventDefault();
+                return;
+            }
 
             const self = this;
             const originalHTML = self.innerHTML;
-            const href = self.getAttribute('href') || '';
-            const isMp3 = href.includes('convert-mp3');
-
-            let loadingMsg = isMp3 ? 'Converting MP3...' : 'Preparing File...';
-            const lang = document.documentElement.lang || '';
-            if (originalHTML.includes('Baixar')) {
-                loadingMsg = isMp3 ? 'Convertendo MP3...' : 'Preparando...';
-            } else if (originalHTML.includes('Télécharger')) {
-                loadingMsg = isMp3 ? 'Conversion MP3...' : 'Préparation...';
-            }
+            const originalWidth = self.offsetWidth;
 
             self.classList.add('is-loading');
-            self.innerHTML = '<span class="spinner-icon"></span> <span>' + loadingMsg + '</span>';
+            if (originalWidth) {
+                self.style.minWidth = originalWidth + 'px';
+            }
+            // Show only the spinning preloader without any text
+            self.innerHTML = '<span class="spinner-icon spinner-only"></span>';
 
-            // Reset after 8 seconds (browser download has already started)
+            // Reset back to original button text/icon after 7 seconds
             setTimeout(function () {
                 self.classList.remove('is-loading');
+                self.style.minWidth = '';
                 self.innerHTML = originalHTML;
-            }, 8000);
+            }, 7000);
         });
     });
 });

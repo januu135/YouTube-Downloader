@@ -127,7 +127,7 @@
                                         <td><span class="badge-ext">{{ stream.extension }}</span></td>
                                         <td>
                                             <a href="{% url 'download_stream' %}?v={{ id }}&fid={{ stream.format_id }}&ext={{ stream.extension }}&title={{ title|urlencode }}" class="btn-table-download"
-                                               target="_blank" rel="noopener noreferrer">
+                                               >
                                                 Télécharger <i class="fa fa-download"></i>
                                             </a>
                                         </td>
@@ -162,10 +162,10 @@
                                             <td>
                                                 {% if stream.is_mp3 %}
                                                     <a href="{% url 'convert_to_mp3' %}?v={{ id }}&abr={{ stream.abr }}&title={{ title|urlencode }}" class="btn-table-download"
-                                                       target="_blank" rel="noopener noreferrer">
+                                                       >
                                                 {% else %}
                                                     <a href="{% url 'download_stream' %}?v={{ id }}&fid={{ stream.format_id }}&ext={{ stream.extension }}&title={{ title|urlencode }}" class="btn-table-download"
-                                                       target="_blank" rel="noopener noreferrer">
+                                                       >
                                                 {% endif %}
                                                     Télécharger <i class="fa fa-download"></i>
                                                 </a>
