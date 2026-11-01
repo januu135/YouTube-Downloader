@@ -33,6 +33,10 @@ ALLOWED_HOSTS = ['*']
 # Allow any custom domain or subdomains configured via environment variable, or wildcard for production
 DOMAIN_HOST = os.environ.get('DOMAIN_NAME', '')
 CSRF_TRUSTED_ORIGINS = [
+    'https://y2-mate.online',
+    'https://*.y2-mate.online',
+    'http://y2-mate.online',
+    'http://*.y2-mate.online',
     'https://*.up.railway.app',
     'https://*.onrender.com',
     'https://*.herokuapp.com',
