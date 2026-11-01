@@ -136,6 +136,7 @@ def extract_with_ytdlp(video_url):
         "extract_flat": False,
         "lazy_playlist": True,
         "no_color": True,
+        "remote_components": ["ejs:github"],
     }
 
     meta = None
@@ -554,6 +555,7 @@ def convert_to_mp3(request):
             '--no-warnings',
             '--quiet',
             '--force-ipv4',
+            '--remote-components', 'ejs:github',
             '--geo-bypass',
             '--extractor-args', 'youtube:player_client=ios,mweb,android,tv',
             '--concurrent-fragments', '4',
@@ -622,6 +624,7 @@ def download_stream(request):
             '--no-warnings',
             '--quiet',
             '--force-ipv4',
+            '--remote-components', 'ejs:github',
             '--geo-bypass',
             '--extractor-args', 'youtube:player_client=ios,mweb,android,tv',
             '--concurrent-fragments', '4',
