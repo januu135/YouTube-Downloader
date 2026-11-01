@@ -74,7 +74,25 @@ def extract_with_ytdlp(video_url):
     last_err = None
 
     base_strategies = [
-        # Strategy 1: Mobile clients first — bypass 'page needs to be reloaded' TV block
+        # Strategy 1: Web + Web Embedded with bgutil POT provider (verified working with cookies & EJS)
+        {
+            "geo_bypass": True,
+            "force_ipv4": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["web_embedded", "web", "mweb", "ios"],
+                },
+                "youtubepot": {
+                    "provider": ["bgutil:http"],
+                },
+            },
+        },
+        # Strategy 2: Default extraction (yt-dlp auto-selects clients and hooks bgutil)
+        {
+            "geo_bypass": True,
+            "force_ipv4": True,
+        },
+        # Strategy 3: Mobile client API
         {
             "geo_bypass": True,
             "force_ipv4": True,
@@ -84,7 +102,7 @@ def extract_with_ytdlp(video_url):
                 }
             },
         },
-        # Strategy 2: TV embedded (sometimes passes bot-check better than raw TV)
+        # Strategy 4: TV embedded fallback
         {
             "geo_bypass": True,
             "force_ipv4": True,
@@ -93,22 +111,6 @@ def extract_with_ytdlp(video_url):
                     "player_client": ["tv_embedded", "tv"],
                 }
             },
-        },
-        # Strategy 3: Multi-client fallback skipping webpage & embedded configs
-        {
-            "geo_bypass": True,
-            "force_ipv4": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["web_embedded", "mweb", "ios"],
-                    "player_skip": ["webpage", "configs"],
-                }
-            },
-        },
-        # Strategy 4: Standard clean yt-dlp extraction with IPv4
-        {
-            "geo_bypass": True,
-            "force_ipv4": True,
         },
     ]
 
@@ -557,7 +559,7 @@ def convert_to_mp3(request):
             '--force-ipv4',
             '--remote-components', 'ejs:github',
             '--geo-bypass',
-            '--extractor-args', 'youtube:player_client=ios,mweb,android,tv',
+            '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
             '--concurrent-fragments', '4',
             '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/ba*/18/b/best',
             '-x',
@@ -626,7 +628,7 @@ def download_stream(request):
             '--force-ipv4',
             '--remote-components', 'ejs:github',
             '--geo-bypass',
-            '--extractor-args', 'youtube:player_client=ios,mweb,android,tv',
+            '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
             '--concurrent-fragments', '4',
             '-f', format_spec,
             '--merge-output-format', 'mp4',
