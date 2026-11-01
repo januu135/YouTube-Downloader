@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import HttpResponse, StreamingHttpResponse
+import sys
 import subprocess
 import requests
 from .forms import DownloadForm
@@ -502,8 +503,9 @@ def id(request):
 
 def convert_to_mp3(request):
     """
-    On-the-fly MP3 conversion using FFmpeg.
-    Transcodes YouTube audio stream into actual MP3 and streams directly to user.
+    On-the-fly MP3 conversion using yt-dlp piped directly into FFmpeg.
+    yt-dlp authenticates with cookies.txt and streams audio bytes to stdout.
+    FFmpeg encodes the audio stream into true MP3 (libmp3lame) piped to the user.
     """
     video_id = request.GET.get('v')
     title = request.GET.get('title', 'audio')
@@ -512,35 +514,26 @@ def convert_to_mp3(request):
     if not video_id:
         return HttpResponse("Missing video id parameter 'v'", status=400)
 
-    try:
-        data = get_video_data(f"https://www.youtube.com/watch?v={video_id}")
-    except Exception as e:
-        return HttpResponse(f"Error extracting video audio: {e}", status=500)
-
-    audio_url = None
-    # Look for a valid direct stream url
-    for a in data.get('stream_audio', []):
-        if a.get('video_url') and not a.get('is_mp3'):
-            audio_url = a.get('video_url')
-            break
-
-    if not audio_url and data.get('streams'):
-        audio_url = data['streams'][0].get('video_url')
-
-    if not audio_url and data.get('stream_audio'):
-        audio_url = data['stream_audio'][0].get('video_url')
-
-    if not audio_url:
-        return HttpResponse("No valid audio stream found for this video", status=404)
-
+    cookie_path = get_cookie_file()
     safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'audio'
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    cmd = [
+    # Build yt-dlp command to stream best audio to stdout
+    ytdl_cmd = [
+        sys.executable, '-m', 'yt_dlp',
+        '--no-warnings',
+        '--quiet',
+        '-f', 'ba/b',
+        '-o', '-',
+    ]
+    if cookie_path:
+        ytdl_cmd.extend(['--cookies', cookie_path])
+    ytdl_cmd.append(video_url)
+
+    ffmpeg_cmd = [
         'ffmpeg',
-        '-reconnect', '1',
-        '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '5',
-        '-i', audio_url,
+        '-loglevel', 'error',
+        '-i', 'pipe:0',
         '-vn',
         '-acodec', 'libmp3lame',
         '-b:a', abr,
@@ -549,9 +542,66 @@ def convert_to_mp3(request):
     ]
 
     try:
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=64 * 1024)
+        p_ytdl = subprocess.Popen(ytdl_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        p_ffmpeg = subprocess.Popen(ffmpeg_cmd, stdin=p_ytdl.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=64 * 1024)
+        p_ytdl.stdout.close()
     except Exception as e:
-        return HttpResponse(f"Failed to start FFmpeg: {e}", status=500)
+        return HttpResponse(f"Conversion error: {e}", status=500)
+
+    def file_iterator():
+        try:
+            while True:
+                chunk = p_ffmpeg.stdout.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            if p_ffmpeg.poll() is None:
+                p_ffmpeg.terminate()
+            if p_ytdl.poll() is None:
+                p_ytdl.terminate()
+
+    response = StreamingHttpResponse(file_iterator(), content_type='audio/mpeg')
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}.mp3"'
+    return response
+
+
+def download_stream(request):
+    """
+    Direct video download streaming using yt-dlp piped to user.
+    yt-dlp authenticates with cookies, fetches the exact format, and streams
+    raw video bytes to stdout.
+    """
+    video_id = request.GET.get('v')
+    fid = request.GET.get('fid')
+    ext = request.GET.get('ext', 'mp4')
+    title = request.GET.get('title', 'video')
+
+    if not video_id:
+        return HttpResponse("Missing video id parameter 'v'", status=400)
+
+    cookie_path = get_cookie_file()
+    safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'video'
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    # Use format_id if valid, else best progressive mp4
+    format_spec = fid if (fid and fid != 'None' and not fid.startswith('mp3')) else 'best[ext=mp4]/best'
+
+    ytdl_cmd = [
+        sys.executable, '-m', 'yt_dlp',
+        '--no-warnings',
+        '--quiet',
+        '-f', format_spec,
+        '-o', '-',
+    ]
+    if cookie_path:
+        ytdl_cmd.extend(['--cookies', cookie_path])
+    ytdl_cmd.append(video_url)
+
+    try:
+        process = subprocess.Popen(ytdl_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=64 * 1024)
+    except Exception as e:
+        return HttpResponse(f"Streaming error: {e}", status=500)
 
     def file_iterator():
         try:
@@ -564,64 +614,7 @@ def convert_to_mp3(request):
             if process.poll() is None:
                 process.terminate()
 
-    response = StreamingHttpResponse(file_iterator(), content_type='audio/mpeg')
-    response['Content-Disposition'] = f'attachment; filename="{safe_title}.mp3"'
+    content_type = f'video/{ext}' if ext != 'mp3' else 'audio/mpeg'
+    response = StreamingHttpResponse(file_iterator(), content_type=content_type)
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}.{ext}"'
     return response
-
-
-def download_stream(request):
-    """
-    Direct proxy download stream.
-    Proxies googlevideo.com data chunk-by-chunk through the Droplet,
-    bypassing IP-binding blocks and triggering direct browser download.
-    """
-    video_id = request.GET.get('v')
-    fid = request.GET.get('fid')
-    ext = request.GET.get('ext', 'mp4')
-    title = request.GET.get('title', 'video')
-
-    if not video_id:
-        return HttpResponse("Missing video id parameter 'v'", status=400)
-
-    try:
-        data = get_video_data(f"https://www.youtube.com/watch?v={video_id}")
-    except Exception as e:
-        return HttpResponse(f"Error extracting video stream: {e}", status=500)
-
-    target_url = None
-    all_streams = data.get('streams', []) + data.get('stream_audio', [])
-    for s in all_streams:
-        if fid and str(s.get('format_id')) == str(fid):
-            target_url = s.get('video_url')
-            ext = s.get('extension', ext)
-            break
-
-    if not target_url and all_streams:
-        target_url = all_streams[0].get('video_url')
-        ext = all_streams[0].get('extension', ext)
-
-    if not target_url:
-        return HttpResponse("Download stream not found", status=404)
-
-    safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'video'
-
-    try:
-        req_headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        req = requests.get(target_url, stream=True, timeout=15, headers=req_headers)
-
-        def stream_content():
-            for chunk in req.iter_content(chunk_size=64 * 1024):
-                if chunk:
-                    yield chunk
-
-        content_type = req.headers.get('Content-Type', f'video/{ext}' if ext != 'mp3' else 'audio/mpeg')
-        response = StreamingHttpResponse(stream_content(), content_type=content_type)
-        response['Content-Disposition'] = f'attachment; filename="{safe_title}.{ext}"'
-        if 'Content-Length' in req.headers:
-            response['Content-Length'] = req.headers['Content-Length']
-        return response
-    except Exception:
-        from django.shortcuts import redirect
-        return redirect(target_url)
