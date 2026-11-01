@@ -74,27 +74,30 @@ def extract_with_ytdlp(video_url):
     last_err = None
 
     base_strategies = [
-        # Strategy 1: TV & TV embedded clients (most resilient against bot-check blocks on datacenter IPs)
+        # Strategy 1: Mobile clients first — bypass 'page needs to be reloaded' TV block
         {
             "geo_bypass": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["tv", "tv_embedded"],
-                }
-            },
-        },
-        # Strategy 2: Mobile client API (ios, mweb bypass desktop web bot checks)
-        {
-            "geo_bypass": True,
+            "force_ipv4": True,
             "extractor_args": {
                 "youtube": {
                     "player_client": ["ios", "mweb", "android"],
                 }
             },
         },
+        # Strategy 2: TV embedded (sometimes passes bot-check better than raw TV)
+        {
+            "geo_bypass": True,
+            "force_ipv4": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_embedded", "tv"],
+                }
+            },
+        },
         # Strategy 3: Multi-client fallback skipping webpage & embedded configs
         {
             "geo_bypass": True,
+            "force_ipv4": True,
             "extractor_args": {
                 "youtube": {
                     "player_client": ["web_embedded", "mweb", "ios"],
@@ -102,9 +105,10 @@ def extract_with_ytdlp(video_url):
                 }
             },
         },
-        # Strategy 4: Standard clean yt-dlp extraction
+        # Strategy 4: Standard clean yt-dlp extraction with IPv4
         {
             "geo_bypass": True,
+            "force_ipv4": True,
         },
     ]
 
