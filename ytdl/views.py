@@ -1,5 +1,7 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
+import subprocess
+import requests
 from .forms import DownloadForm
 import os
 import re
@@ -200,6 +202,7 @@ def extract_with_ytdlp(video_url):
             if key not in seen_video_keys:
                 seen_video_keys.add(key)
                 video_streams.append({
+                    "format_id": m.get("format_id", ""),
                     "resolution": res_label,
                     "height": height or 0,
                     "is_progressive": 1 if is_progressive else 0,
@@ -213,6 +216,7 @@ def extract_with_ytdlp(video_url):
             if key not in seen_audio_keys:
                 seen_audio_keys.add(key)
                 audio_streams.append({
+                    "format_id": m.get("format_id", ""),
                     "resolution": f"{int(abr)} kbps" if abr else "Audio",
                     "extension": ext,
                     "file_size": file_size_str,
@@ -238,11 +242,34 @@ def extract_with_ytdlp(video_url):
     except Exception:
         views = "0"
 
+    # Add MP3 converter format option at the top of audio streams
+    audio_streams_with_mp3 = [
+        {
+            "format_id": "mp3-320",
+            "resolution": "320 kbps (High Quality)",
+            "extension": "mp3",
+            "file_size": "MP3 Audio",
+            "is_mp3": True,
+            "abr": "320k",
+            "video_url": audio_streams[0]["video_url"] if audio_streams else "",
+        },
+        {
+            "format_id": "mp3-192",
+            "resolution": "192 kbps (Standard)",
+            "extension": "mp3",
+            "file_size": "MP3 Audio",
+            "is_mp3": True,
+            "abr": "192k",
+            "video_url": audio_streams[0]["video_url"] if audio_streams else "",
+        },
+    ] + audio_streams
+
     return {
+        "id": meta.get("id", "") or extract_video_id(video_url) or "",
         "title": meta.get("title", "Unknown Title"),
         "author": meta.get("uploader", ""),
         "streams": video_streams,
-        "stream_audio": audio_streams,
+        "stream_audio": audio_streams_with_mp3,
         "description": meta.get("description", ""),
         "likes": meta.get("like_count", 0),
         "dislikes": meta.get("dislike_count", 0),
@@ -352,10 +379,11 @@ def extract_with_pytubefix(video_url):
             views = "0"
 
     return {
+        "id": getattr(yt, "video_id", "") or extract_video_id(video_url) or "",
         "title": getattr(yt, "title", "Unknown Title") or "Unknown Title",
         "author": getattr(yt, "author", "") or "",
         "streams": video_streams,
-        "stream_audio": audio_streams,
+        "stream_audio": audio_streams_with_mp3,
         "description": getattr(yt, "description", "") or "",
         "likes": 0,
         "dislikes": 0,
@@ -470,3 +498,130 @@ def id(request):
         except Exception as e:
             return HttpResponse(f"Unable to fetch video information.<br><br>Error: {str(e)}")
     return render(request, "id.html", {"form": form})
+
+
+def convert_to_mp3(request):
+    """
+    On-the-fly MP3 conversion using FFmpeg.
+    Transcodes YouTube audio stream into actual MP3 and streams directly to user.
+    """
+    video_id = request.GET.get('v')
+    title = request.GET.get('title', 'audio')
+    abr = request.GET.get('abr', '192k')
+
+    if not video_id:
+        return HttpResponse("Missing video id parameter 'v'", status=400)
+
+    try:
+        data = get_video_data(f"https://www.youtube.com/watch?v={video_id}")
+    except Exception as e:
+        return HttpResponse(f"Error extracting video audio: {e}", status=500)
+
+    audio_url = None
+    # Look for a valid direct stream url
+    for a in data.get('stream_audio', []):
+        if a.get('video_url') and not a.get('is_mp3'):
+            audio_url = a.get('video_url')
+            break
+
+    if not audio_url and data.get('streams'):
+        audio_url = data['streams'][0].get('video_url')
+
+    if not audio_url and data.get('stream_audio'):
+        audio_url = data['stream_audio'][0].get('video_url')
+
+    if not audio_url:
+        return HttpResponse("No valid audio stream found for this video", status=404)
+
+    safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'audio'
+
+    cmd = [
+        'ffmpeg',
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
+        '-i', audio_url,
+        '-vn',
+        '-acodec', 'libmp3lame',
+        '-b:a', abr,
+        '-f', 'mp3',
+        'pipe:1'
+    ]
+
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=64 * 1024)
+    except Exception as e:
+        return HttpResponse(f"Failed to start FFmpeg: {e}", status=500)
+
+    def file_iterator():
+        try:
+            while True:
+                chunk = process.stdout.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            if process.poll() is None:
+                process.terminate()
+
+    response = StreamingHttpResponse(file_iterator(), content_type='audio/mpeg')
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}.mp3"'
+    return response
+
+
+def download_stream(request):
+    """
+    Direct proxy download stream.
+    Proxies googlevideo.com data chunk-by-chunk through the Droplet,
+    bypassing IP-binding blocks and triggering direct browser download.
+    """
+    video_id = request.GET.get('v')
+    fid = request.GET.get('fid')
+    ext = request.GET.get('ext', 'mp4')
+    title = request.GET.get('title', 'video')
+
+    if not video_id:
+        return HttpResponse("Missing video id parameter 'v'", status=400)
+
+    try:
+        data = get_video_data(f"https://www.youtube.com/watch?v={video_id}")
+    except Exception as e:
+        return HttpResponse(f"Error extracting video stream: {e}", status=500)
+
+    target_url = None
+    all_streams = data.get('streams', []) + data.get('stream_audio', [])
+    for s in all_streams:
+        if fid and str(s.get('format_id')) == str(fid):
+            target_url = s.get('video_url')
+            ext = s.get('extension', ext)
+            break
+
+    if not target_url and all_streams:
+        target_url = all_streams[0].get('video_url')
+        ext = all_streams[0].get('extension', ext)
+
+    if not target_url:
+        return HttpResponse("Download stream not found", status=404)
+
+    safe_title = re.sub(r'[^\w\s-]', '', title).strip() or 'video'
+
+    try:
+        req_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        req = requests.get(target_url, stream=True, timeout=15, headers=req_headers)
+
+        def stream_content():
+            for chunk in req.iter_content(chunk_size=64 * 1024):
+                if chunk:
+                    yield chunk
+
+        content_type = req.headers.get('Content-Type', f'video/{ext}' if ext != 'mp3' else 'audio/mpeg')
+        response = StreamingHttpResponse(stream_content(), content_type=content_type)
+        response['Content-Disposition'] = f'attachment; filename="{safe_title}.{ext}"'
+        if 'Content-Length' in req.headers:
+            response['Content-Length'] = req.headers['Content-Length']
+        return response
+    except Exception:
+        from django.shortcuts import redirect
+        return redirect(target_url)

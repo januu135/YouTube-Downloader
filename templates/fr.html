@@ -126,8 +126,8 @@
                                         <td><b>{{ stream.file_size }}</b></td>
                                         <td><span class="badge-ext">{{ stream.extension }}</span></td>
                                         <td>
-                                            <a href="{{ stream.video_url }}" class="btn-table-download"
-                                               download="{{ title }}.{{ stream.extension }}" target="_blank" rel="noopener noreferrer">
+                                            <a href="{% url 'download_stream' %}?v={{ id }}&fid={{ stream.format_id }}&ext={{ stream.extension }}&title={{ title|urlencode }}" class="btn-table-download"
+                                               target="_blank" rel="noopener noreferrer">
                                                 Télécharger <i class="fa fa-download"></i>
                                             </a>
                                         </td>
@@ -160,8 +160,13 @@
                                             <td><b>{{ stream.file_size }}</b></td>
                                             <td><span class="badge-ext">{{ stream.extension }}</span></td>
                                             <td>
-                                                <a href="{{ stream.video_url }}" class="btn-table-download"
-                                                   download="{{ title }}.{{ stream.extension }}" target="_blank" rel="noopener noreferrer">
+                                                {% if stream.is_mp3 %}
+                                                    <a href="{% url 'convert_to_mp3' %}?v={{ id }}&abr={{ stream.abr }}&title={{ title|urlencode }}" class="btn-table-download"
+                                                       target="_blank" rel="noopener noreferrer">
+                                                {% else %}
+                                                    <a href="{% url 'download_stream' %}?v={{ id }}&fid={{ stream.format_id }}&ext={{ stream.extension }}&title={{ title|urlencode }}" class="btn-table-download"
+                                                       target="_blank" rel="noopener noreferrer">
+                                                {% endif %}
                                                     Télécharger <i class="fa fa-download"></i>
                                                 </a>
                                             </td>

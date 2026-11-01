@@ -22,4 +22,6 @@ urlpatterns = [
     path('br/', views.br, name='br'),
     path('fr/', views.fr, name='fr'),
     path('id/', views.id, name='id'),
+    path('convert-mp3/', views.convert_to_mp3, name='convert_to_mp3'),
+    path('download-stream/', views.download_stream, name='download_stream'),
 ]
