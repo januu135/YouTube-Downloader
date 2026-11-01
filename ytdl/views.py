@@ -48,47 +48,51 @@ def extract_with_ytdlp(video_url):
     cookie_path = get_cookie_file()
     last_err = None
 
-    strategies = [
-        # Strategy 1: Standard clean yt-dlp extraction (best compatibility across monetized videos)
-        {
-            "geo_bypass": True,
-        },
-        # Strategy 2: Multi-client fallback skipping webpage & embedded configs (bypasses HTML ad injection)
+    base_strategies = [
+        # Strategy 1: TV & TV embedded clients (most resilient against bot-check blocks on datacenter IPs)
         {
             "geo_bypass": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["web", "mweb", "android", "ios"],
+                    "player_client": ["tv", "tv_embedded"],
+                }
+            },
+        },
+        # Strategy 2: Mobile client API (ios, mweb bypass desktop web bot checks)
+        {
+            "geo_bypass": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "mweb", "android"],
+                }
+            },
+        },
+        # Strategy 3: Multi-client fallback skipping webpage & embedded configs
+        {
+            "geo_bypass": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["web_embedded", "mweb", "ios"],
                     "player_skip": ["webpage", "configs"],
                 }
             },
         },
-        # Strategy 3: Mobile client API (avoids desktop web ad checkpoints)
+        # Strategy 4: Standard clean yt-dlp extraction
         {
             "geo_bypass": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "ios", "mweb"],
-                }
-            },
-        },
-        # Strategy 4: Web embedded & TV client
-        {
-            "geo_bypass": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["web_embedded", "tv"],
-                }
-            },
         },
     ]
 
-    # If a real cookie file exists on disk, append authenticated fallback strategies
+    strategies = []
+    # If a real cookie file exists on disk, prioritize authenticated strategies FIRST
     if cookie_path:
-        for s in strategies[:2]:
+        for s in base_strategies:
             cs = dict(s)
             cs["cookiefile"] = cookie_path
             strategies.append(cs)
+
+    # Append unauthenticated strategies as fallback
+    strategies.extend(base_strategies)
 
     common_opts = {
         "quiet": True,
@@ -234,9 +238,10 @@ def extract_with_pytubefix(video_url):
     last_err = None
 
     client_candidates = [
-        "ANDROID",
+        "ANDROID_VR",
         "IOS",
         "MWEB",
+        "ANDROID",
         "WEB",
     ]
 
