@@ -549,6 +549,9 @@ def convert_to_mp3(request):
             sys.executable, '-m', 'yt_dlp',
             '--no-warnings',
             '--quiet',
+            '--geo-bypass',
+            '--extractor-args', 'youtube:player_client=tv,tv_embedded,ios,mweb',
+            '-f', 'ba/ba*/18/b/best',
             '-x',
             '--audio-format', 'mp3',
             '--audio-quality', abr,
@@ -606,11 +609,13 @@ def download_stream(request):
             break
 
     if not valid_file:
-        format_spec = f"{fid}+ba/b[ext=mp4]/{fid}/best" if (fid and fid != 'None') else "best[ext=mp4]/best"
+        format_spec = f"{fid}+ba/b[ext=mp4]/{fid}/18/best" if (fid and fid != 'None') else "18/best[ext=mp4]/best"
         ytdl_cmd = [
             sys.executable, '-m', 'yt_dlp',
             '--no-warnings',
             '--quiet',
+            '--geo-bypass',
+            '--extractor-args', 'youtube:player_client=tv,tv_embedded,ios,mweb',
             '-f', format_spec,
             '--merge-output-format', 'mp4',
             '-o', f"{target_base}.%(ext)s",
