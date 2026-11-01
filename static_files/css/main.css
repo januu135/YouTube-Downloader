@@ -852,3 +852,49 @@ footer.modern-footer {
         padding: 2px 6px;
     }
 }
+
+
+/* ==========================================================================
+   Preloader & Button Loading State Styles
+   ========================================================================== */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+    from { box-shadow: 0 0 0 2px var(--primary-glow), var(--shadow-md); }
+    to { box-shadow: 0 0 0 6px var(--primary-glow), var(--shadow-lg); }
+}
+
+.spinner-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2.5px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+.btn-download-action.is-loading {
+    background: linear-gradient(135deg, #e11d48, #be123c) !important;
+    cursor: wait !important;
+    pointer-events: none;
+    opacity: 0.92;
+}
+
+.btn-table-download.is-loading {
+    background: #475569 !important;
+    cursor: wait !important;
+    pointer-events: none;
+    opacity: 0.9;
+    box-shadow: none;
+}
+
+.search-box-wrapper.is-loading {
+    border-color: var(--primary) !important;
+    animation: pulseGlow 1.2s infinite alternate !important;
+}
