@@ -1,10 +1,35 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{% block lang %}en-US{% endblock %}">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-FGV934HQ71"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-FGV934HQ71');
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="google-site-verification" content="uLcq40ZvtH6BqoAj6cVN8Hp9C6edNlDMPDuMwwLg-xs" />
+
+    <title>{% block title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}</title>
+    <meta name="title" content="{% block meta_title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}">
+    <meta name="description" content="{% block meta_description %}Y2mate is a Popular free YouTube video Downloader that allows users to easily convert and download videos from YouTube in High quality quickly and easily.{% endblock %}">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{% block og_title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Y2mate is a Popular free YouTube video Downloader that allows users to easily convert and download videos from YouTube in High quality quickly and easily.{% endblock %}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="{% block twitter_title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}">
+    <meta property="twitter:description" content="{% block twitter_description %}Y2mate is a Popular free YouTube video Downloader that allows users to easily convert and download videos from YouTube in High quality quickly and easily.{% endblock %}">
+
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     
     <!-- Preconnect CDNs -->
@@ -19,11 +44,10 @@
     
     <!-- Core CSS -->
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
-    
-    <title>{% block title %}Y2Mate - Fast & Free YouTube Video Downloader{% endblock %}</title>
 
     <!-- jQuery loaded in head -->
     <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <div class="site-wrapper">
