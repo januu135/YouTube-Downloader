@@ -907,3 +907,90 @@ footer.modern-footer {
     display: inline-block;
     vertical-align: middle;
 }
+
+/* ==========================================================================
+   Privacy Policy & Terms and Conditions Pages
+   ========================================================================== */
+.y2mate-content-other {
+    background: #ffffff;
+    border-radius: var(--radius-lg, 16px);
+    padding: 40px;
+    margin: 30px auto 50px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color, #e2e8f0);
+    max-width: 1000px;
+    color: #334155;
+    line-height: 1.75;
+}
+
+.y2mate-content-other h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.y2mate-content-other h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 32px;
+    margin-bottom: 14px;
+}
+
+.y2mate-content-other h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 24px;
+    margin-bottom: 10px;
+}
+
+.y2mate-content-other p {
+    font-size: 0.975rem;
+    color: #475569;
+    margin-bottom: 16px;
+    line-height: 1.7;
+}
+
+.y2mate-content-other ul {
+    margin: 12px 0 20px 24px;
+    padding-left: 10px;
+    list-style-type: disc;
+}
+
+.y2mate-content-other li {
+    font-size: 0.95rem;
+    color: #475569;
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.y2mate-content-other a {
+    color: #e11d48;
+    text-decoration: underline;
+    font-weight: 500;
+    word-break: break-all;
+}
+
+.y2mate-content-other a:hover {
+    color: #be123c;
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .y2mate-content-other {
+        padding: 24px 18px;
+        margin: 20px 12px 40px;
+        border-radius: 12px;
+    }
+    .y2mate-content-other h1 {
+        font-size: 1.6rem;
+    }
+    .y2mate-content-other h2 {
+        font-size: 1.2rem;
+    }
+}
+

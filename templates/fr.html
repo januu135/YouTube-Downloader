@@ -6,6 +6,10 @@
 {% block meta_title %}Y2mate - Téléchargeur YouTube | Télécharger des vidéos YouTube gratuitement{% endblock %}
 {% block meta_description %}Y2mate est un téléchargeur de vidéos YouTube gratuit et populaire qui permet de convertir et de télécharger des vidéos YouTube en haute qualité rapidement et facilement.{% endblock %}
 
+{% block canonical %}https://y2-mate.online/fr/{% endblock %}
+{% block og_url %}https://y2-mate.online/fr/{% endblock %}
+{% block twitter_url %}https://y2-mate.online/fr/{% endblock %}
+
 
 {% block content %}
     <!-- Modern Sticky Navbar -->
@@ -18,7 +22,9 @@
                 <span>Y2Mate</span>
             </a>
             <div class="nav-links">
-                <a href="{% url 'fr' %}">Accueil</a>
+                <a href="{% url 'fr' %}" class="active">Accueil</a>
+                <a href="{% url 'terms_and_conditions' %}">Conditions</a>
+                <a href="{% url 'privacy_policy' %}">Confidentialité</a>
                 <div class="lang-dropdown">
                     <button type="button" class="lang-btn">
                         <i class="fa fa-globe"></i> Français <i class="fa fa-chevron-down" style="font-size: 10px;"></i>
@@ -247,8 +253,8 @@
                     <ul>
                         <li><a href="{% url 'fr' %}">Téléchargeur YouTube</a></li>
                         <li><a href="{% url 'fr' %}">Convertisseur YouTube vers MP3</a></li>
-                        <li><a href="#">Conditions d'Utilisation</a></li>
-                        <li><a href="#">Politique de Confidentialité</a></li>
+                        <li><a href="{% url 'terms_and_conditions' %}">Conditions d'Utilisation</a></li>
+                        <li><a href="{% url 'privacy_policy' %}">Politique de Confidentialité</a></li>
                     </ul>
                 </div>
             </div>

@@ -658,3 +658,18 @@ def download_stream(request):
     actual_ext = valid_file.split('.')[-1]
     content_type = f'video/{actual_ext}' if actual_ext != 'mp3' else 'audio/mpeg'
     return FileResponse(open(valid_file, 'rb'), content_type=content_type, as_attachment=True, filename=f"{safe_title}.{actual_ext}")
+
+
+def privacy_policy(request):
+    """
+    Renders Privacy Policy page.
+    """
+    return render(request, 'privacy-policy.html')
+
+
+def terms_and_conditions(request):
+    """
+    Renders Terms and Conditions page.
+    """
+    return render(request, 'terms-and-conditions.html')
+

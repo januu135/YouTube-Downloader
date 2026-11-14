@@ -22,13 +22,23 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
+    <meta property="og:url" content="{% block og_url %}https://y2-mate.online/{% endblock %}">
     <meta property="og:title" content="{% block og_title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}">
     <meta property="og:description" content="{% block og_description %}Y2mate is a Popular free YouTube video Downloader that allows users to easily convert and download videos from YouTube in High quality quickly and easily.{% endblock %}">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{% block twitter_url %}https://y2-mate.online/{% endblock %}">
     <meta property="twitter:title" content="{% block twitter_title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}">
     <meta property="twitter:description" content="{% block twitter_description %}Y2mate is a Popular free YouTube video Downloader that allows users to easily convert and download videos from YouTube in High quality quickly and easily.{% endblock %}">
+
+    <!-- Canonical and Alternate Languages -->
+    <link rel="canonical" href="{% block canonical %}https://y2-mate.online/{% endblock %}">
+    <link rel="alternate" hreflang="x-default" href="https://y2-mate.online/">
+    <link rel="alternate" hreflang="en" href="https://y2-mate.online/">
+    <link rel="alternate" hreflang="pt-BR" href="https://y2-mate.online/br/">
+    <link rel="alternate" hreflang="fr-FR" href="https://y2-mate.online/fr/">
+    <link rel="alternate" hreflang="id-ID" href="https://y2-mate.online/id/">
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">

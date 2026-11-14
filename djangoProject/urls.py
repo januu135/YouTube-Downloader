@@ -49,6 +49,16 @@ def sitemap_view(request):
        <lastmod>2026-11-05T13:31:14+00:00</lastmod>
        <priority>0.8000</priority>
   </url>
+  <url>
+       <loc>https://y2-mate.online/terms-and-conditions/</loc>
+       <lastmod>2026-11-15T00:00:00+00:00</lastmod>
+       <priority>0.5000</priority>
+  </url>
+  <url>
+       <loc>https://y2-mate.online/privacy-policy/</loc>
+       <lastmod>2026-11-15T00:00:00+00:00</lastmod>
+       <priority>0.5000</priority>
+  </url>
 </urlset>'''
     return HttpResponse(content, content_type="application/xml")
 
@@ -60,6 +70,11 @@ urlpatterns = [
     path('favicon.ico', favicon_view, name='favicon'),
     path('sitemap.xml', sitemap_view, name='sitemap'),
     path('robots.txt', robots_view, name='robots'),
+    path('privacy-policy/', views.privacy_policy, name='privacy_policy'),
+    path('privacy/', views.privacy_policy, name='privacy'),
+    path('terms-and-conditions/', views.terms_and_conditions, name='terms_and_conditions'),
+    path('terms-of-service/', views.terms_and_conditions, name='terms_of_service'),
+    path('terms/', views.terms_and_conditions, name='terms'),
     path('', views.download_video, name='download_video'),
     path('br/', views.br, name='br'),
     path('fr/', views.fr, name='fr'),

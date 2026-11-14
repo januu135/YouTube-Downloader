@@ -6,6 +6,10 @@
 {% block meta_title %}Y2mate - Pengunduh YouTube | Unduh Video YouTube Gratis{% endblock %}
 {% block meta_description %}Y2mate adalah Pengunduh video YouTube gratis yang memungkinkan pengguna mengonversi dan mengunduh video dari YouTube dengan kualitas tinggi dengan cepat dan mudah.{% endblock %}
 
+{% block canonical %}https://y2-mate.online/id/{% endblock %}
+{% block og_url %}https://y2-mate.online/id/{% endblock %}
+{% block twitter_url %}https://y2-mate.online/id/{% endblock %}
+
 
 {% block content %}
     <!-- Modern Sticky Navbar -->
@@ -18,7 +22,9 @@
                 <span>Y2Mate</span>
             </a>
             <div class="nav-links">
-                <a href="{% url 'id' %}">Beranda</a>
+                <a href="{% url 'id' %}" class="active">Beranda</a>
+                <a href="{% url 'terms_and_conditions' %}">Ketentuan</a>
+                <a href="{% url 'privacy_policy' %}">Privasi</a>
                 <div class="lang-dropdown">
                     <button type="button" class="lang-btn">
                         <i class="fa fa-globe"></i> Indonesia <i class="fa fa-chevron-down" style="font-size: 10px;"></i>
@@ -247,8 +253,8 @@
                     <ul>
                         <li><a href="{% url 'id' %}">YouTube Video Downloader</a></li>
                         <li><a href="{% url 'id' %}">YouTube to MP3 Converter</a></li>
-                        <li><a href="#">Ketentuan Layanan</a></li>
-                        <li><a href="#">Kebijakan Privasi</a></li>
+                        <li><a href="{% url 'terms_and_conditions' %}">Ketentuan Layanan</a></li>
+                        <li><a href="{% url 'privacy_policy' %}">Kebijakan Privasi</a></li>
                     </ul>
                 </div>
             </div>

@@ -6,6 +6,10 @@
 {% block meta_title %}Y2mate - Youtube Downloader | Download Youtube Video Free{% endblock %}
 {% block meta_description %}Y2mate is a Popular free YouTube video Downloader that allows users to easily convert and download videos from YouTube in High quality quickly and easily.{% endblock %}
 
+{% block canonical %}https://y2-mate.online/{% endblock %}
+{% block og_url %}https://y2-mate.online/{% endblock %}
+{% block twitter_url %}https://y2-mate.online/{% endblock %}
+
 
 {% block content %}
     <!-- Modern Sticky Navbar -->
@@ -18,7 +22,9 @@
                 <span>Y2Mate</span>
             </a>
             <div class="nav-links">
-                <a href="{% url 'download_video' %}">Home</a>
+                <a href="{% url 'download_video' %}" class="active">Home</a>
+                <a href="{% url 'terms_and_conditions' %}">Terms</a>
+                <a href="{% url 'privacy_policy' %}">Privacy Policy</a>
                 <div class="lang-dropdown">
                     <button type="button" class="lang-btn">
                         <i class="fa fa-globe"></i> English <i class="fa fa-chevron-down" style="font-size: 10px;"></i>
@@ -251,8 +257,8 @@
                     <ul>
                         <li><a href="{% url 'download_video' %}">YouTube Video Downloader</a></li>
                         <li><a href="{% url 'download_video' %}">YouTube to MP3 Converter</a></li>
-                        <li><a href="#">Terms of Service</a></li>
-                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="{% url 'terms_and_conditions' %}">Terms of Service</a></li>
+                        <li><a href="{% url 'privacy_policy' %}">Privacy Policy</a></li>
                     </ul>
                 </div>
             </div>
