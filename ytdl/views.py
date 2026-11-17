@@ -131,7 +131,7 @@ def extract_with_ytdlp(video_url):
         "skip_download": True,
         "nocheckcertificate": True,
         "cachedir": False,
-        "socket_timeout": 8,
+        "socket_timeout": 5,
         "getcomments": False,
         "writesubtitles": False,
         "writeautomaticsub": False,
@@ -154,7 +154,7 @@ def extract_with_ytdlp(video_url):
             last_err = e
             err_msg = str(e).lower()
             if ("not available in your country" in err_msg or "blocked it in your country" in err_msg) and "152" not in err_msg:
-                for country in ["US", "GB", "DE", "IN"]:
+                for country in ["US", "DE"]:
                     try:
                         retry_opts = dict(common_opts)
                         retry_opts.update(strat)
@@ -305,8 +305,6 @@ def extract_with_pytubefix(video_url):
         "ANDROID_VR",
         "IOS",
         "MWEB",
-        "ANDROID",
-        "WEB",
     ]
 
     for client_name in client_candidates:
@@ -511,17 +509,24 @@ def id(request):
     return render(request, "id.html", {"form": form})
 
 
+import threading
+
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), 'ytdl_downloads')
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+_DOWNLOAD_LOCK = threading.Lock()
+_ACTIVE_DOWNLOADS = {}
 
 
 def cleanup_old_downloads():
-    """Clean up files in DOWNLOAD_DIR older than 1 hour to prevent disk bloat."""
+    """
+    Clean up temporary files in DOWNLOAD_DIR older than 30 minutes to prevent disk bloat
+    and eliminate server filesystem exhaustion that causes 502 Bad Gateway.
+    """
     try:
         now = time.time()
         for f in os.listdir(DOWNLOAD_DIR):
             fpath = os.path.join(DOWNLOAD_DIR, f)
-            if os.path.isfile(fpath) and (now - os.path.getmtime(fpath)) > 3600:
+            if os.path.isfile(fpath) and (now - os.path.getmtime(fpath)) > 1800:
                 try:
                     os.remove(fpath)
                 except Exception:
@@ -552,38 +557,57 @@ def convert_to_mp3(request):
     target_pattern = os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}.mp3")
 
     if not os.path.exists(target_pattern) or os.path.getsize(target_pattern) < 1000:
-        ytdl_cmd = [
-            sys.executable, '-m', 'yt_dlp',
-            '--no-warnings',
-            '--quiet',
-            '--force-ipv4',
-            '--remote-components', 'ejs:github',
-            '--geo-bypass',
-            '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
-            '--concurrent-fragments', '4',
-            '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/ba*/18/b/best',
-            '-x',
-            '--audio-format', 'mp3',
-            '--audio-quality', abr,
-            '--postprocessor-args', 'ffmpeg:-threads 0',
-            '-o', os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}.%(ext)s"),
-        ]
-        if cookie_path:
-            ytdl_cmd.extend(['--cookies', cookie_path])
-        ytdl_cmd.append(video_url)
+        # Use a file-lock or in-process lock per video_id to avoid concurrent duplicate ffmpeg conversions
+        lock_key = f"mp3_{video_id}_{abr}"
+        with _DOWNLOAD_LOCK:
+            if lock_key not in _ACTIVE_DOWNLOADS:
+                _ACTIVE_DOWNLOADS[lock_key] = threading.Event()
+                is_downloader = True
+            else:
+                is_downloader = False
+                wait_event = _ACTIVE_DOWNLOADS[lock_key]
 
-        try:
-            res = subprocess.run(ytdl_cmd, capture_output=True, text=True, timeout=120)
-            if res.returncode != 0:
-                print(f"[yt-dlp MP3 error] {res.stderr}")
-                return HttpResponse(f"MP3 conversion error: {res.stderr or 'Failed to download'}", status=500)
-        except Exception as e:
-            return HttpResponse(f"Conversion error: {e}", status=500)
+        if not is_downloader:
+            # Wait for the primary downloader thread/process to complete (up to 75 seconds)
+            wait_event.wait(timeout=75)
+        else:
+            try:
+                ytdl_cmd = [
+                    sys.executable, '-m', 'yt_dlp',
+                    '--no-warnings',
+                    '--quiet',
+                    '--force-ipv4',
+                    '--remote-components', 'ejs:github',
+                    '--geo-bypass',
+                    '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
+                    '--concurrent-fragments', '2',
+                    '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/ba*/18/b/best',
+                    '-x',
+                    '--audio-format', 'mp3',
+                    '--audio-quality', abr,
+                    '--postprocessor-args', 'ffmpeg:-threads 2',
+                    '-o', os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}.%(ext)s"),
+                ]
+                if cookie_path:
+                    ytdl_cmd.extend(['--cookies', cookie_path])
+                ytdl_cmd.append(video_url)
+
+                try:
+                    res = subprocess.run(ytdl_cmd, capture_output=True, text=True, timeout=90)
+                    if res.returncode != 0:
+                        print(f"[yt-dlp MP3 error] {res.stderr}")
+                except Exception as e:
+                    print(f"[MP3 conversion error] {e}")
+            finally:
+                with _DOWNLOAD_LOCK:
+                    event = _ACTIVE_DOWNLOADS.pop(lock_key, None)
+                    if event:
+                        event.set()
 
     # Find the generated mp3 file
     candidates = glob.glob(os.path.join(DOWNLOAD_DIR, f"{video_id}_{abr}*.mp3"))
     if not candidates or os.path.getsize(candidates[0]) < 1000:
-        return HttpResponse("MP3 conversion failed (empty file generated)", status=500)
+        return HttpResponse("MP3 conversion failed or timed out. Please try again.", status=504)
 
     filepath = candidates[0]
     return FileResponse(open(filepath, 'rb'), content_type='audio/mpeg', as_attachment=True, filename=f"{safe_title}.mp3")
@@ -620,31 +644,48 @@ def download_stream(request):
             break
 
     if not valid_file:
-        format_spec = f"{fid}+ba/b[ext=mp4]/{fid}/18/best" if (fid and fid != 'None') else "18/best[ext=mp4]/best"
-        ytdl_cmd = [
-            sys.executable, '-m', 'yt_dlp',
-            '--no-warnings',
-            '--quiet',
-            '--force-ipv4',
-            '--remote-components', 'ejs:github',
-            '--geo-bypass',
-            '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
-            '--concurrent-fragments', '4',
-            '-f', format_spec,
-            '--merge-output-format', 'mp4',
-            '-o', f"{target_base}.%(ext)s",
-        ]
-        if cookie_path:
-            ytdl_cmd.extend(['--cookies', cookie_path])
-        ytdl_cmd.append(video_url)
+        lock_key = f"vid_{video_id}_{fid_clean}"
+        with _DOWNLOAD_LOCK:
+            if lock_key not in _ACTIVE_DOWNLOADS:
+                _ACTIVE_DOWNLOADS[lock_key] = threading.Event()
+                is_downloader = True
+            else:
+                is_downloader = False
+                wait_event = _ACTIVE_DOWNLOADS[lock_key]
 
-        try:
-            res = subprocess.run(ytdl_cmd, capture_output=True, text=True, timeout=120)
-            if res.returncode != 0:
-                print(f"[yt-dlp Video error] {res.stderr}")
-                return HttpResponse(f"Video download error: {res.stderr or 'Failed to download'}", status=500)
-        except Exception as e:
-            return HttpResponse(f"Streaming error: {e}", status=500)
+        if not is_downloader:
+            wait_event.wait(timeout=75)
+        else:
+            try:
+                format_spec = f"{fid}+ba/b[ext=mp4]/{fid}/18/best" if (fid and fid != 'None') else "18/best[ext=mp4]/best"
+                ytdl_cmd = [
+                    sys.executable, '-m', 'yt_dlp',
+                    '--no-warnings',
+                    '--quiet',
+                    '--force-ipv4',
+                    '--remote-components', 'ejs:github',
+                    '--geo-bypass',
+                    '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
+                    '--concurrent-fragments', '2',
+                    '-f', format_spec,
+                    '--merge-output-format', 'mp4',
+                    '-o', f"{target_base}.%(ext)s",
+                ]
+                if cookie_path:
+                    ytdl_cmd.extend(['--cookies', cookie_path])
+                ytdl_cmd.append(video_url)
+
+                try:
+                    res = subprocess.run(ytdl_cmd, capture_output=True, text=True, timeout=90)
+                    if res.returncode != 0:
+                        print(f"[yt-dlp Video error] {res.stderr}")
+                except Exception as e:
+                    print(f"[Video streaming error] {e}")
+            finally:
+                with _DOWNLOAD_LOCK:
+                    event = _ACTIVE_DOWNLOADS.pop(lock_key, None)
+                    if event:
+                        event.set()
 
         candidates = glob.glob(f"{target_base}.*")
         for c in candidates:
@@ -653,7 +694,7 @@ def download_stream(request):
                 break
 
     if not valid_file:
-        return HttpResponse("Video download failed (file could not be finalized)", status=500)
+        return HttpResponse("Video download failed or timed out. Please try again.", status=504)
 
     actual_ext = valid_file.split('.')[-1]
     content_type = f'video/{actual_ext}' if actual_ext != 'mp3' else 'audio/mpeg'

@@ -66,7 +66,16 @@ def robots_view(request):
     content = "User-agent: *\nAllow: /\n\nSitemap: https://y2-mate.online/sitemap.xml\n"
     return HttpResponse(content, content_type="text/plain")
 
+def health_view(request):
+    """
+    Lightweight health check endpoint for monitoring, Nginx load-balancer,
+    and uptime probes without heavy processing.
+    """
+    return HttpResponse("OK", content_type="text/plain", status=200)
+
 urlpatterns = [
+    path('health/', health_view, name='health'),
+    path('healthz/', health_view, name='healthz'),
     path('favicon.ico', favicon_view, name='favicon'),
     path('sitemap.xml', sitemap_view, name='sitemap'),
     path('robots.txt', robots_view, name='robots'),
