@@ -74,7 +74,17 @@ def extract_with_ytdlp(video_url):
     last_err = None
 
     base_strategies = [
-        # Strategy 1: Web + Web Embedded with bgutil POT provider (verified working with cookies & EJS)
+        # Strategy 1: Multi-client mobile API (Android + iOS + mweb + web_embedded) - highest reliability, bypasses bot detection and ads without expired cookies
+        {
+            "geo_bypass": True,
+            "force_ipv4": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "ios", "web_embedded", "mweb"],
+                },
+            },
+        },
+        # Strategy 2: Web Embedded + Web with bgutil POT provider
         {
             "geo_bypass": True,
             "force_ipv4": True,
@@ -87,20 +97,10 @@ def extract_with_ytdlp(video_url):
                 },
             },
         },
-        # Strategy 2: Default extraction (yt-dlp auto-selects clients and hooks bgutil)
+        # Strategy 3: Default extraction auto-client
         {
             "geo_bypass": True,
             "force_ipv4": True,
-        },
-        # Strategy 3: Mobile client API
-        {
-            "geo_bypass": True,
-            "force_ipv4": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["ios", "mweb", "android"],
-                }
-            },
         },
         # Strategy 4: TV embedded fallback
         {
@@ -115,15 +115,15 @@ def extract_with_ytdlp(video_url):
     ]
 
     strategies = []
-    # If a real cookie file exists on disk, prioritize authenticated strategies FIRST
+    # Prioritize clean unauthenticated mobile extraction FIRST (to prevent blocked/expired cookies from failing the request)
+    strategies.extend(base_strategies)
+
+    # If a real cookie file exists on disk, append authenticated strategies as fallback
     if cookie_path:
         for s in base_strategies:
             cs = dict(s)
             cs["cookiefile"] = cookie_path
             strategies.append(cs)
-
-    # Append unauthenticated strategies as fallback
-    strategies.extend(base_strategies)
 
     common_opts = {
         "quiet": True,
@@ -579,7 +579,7 @@ def convert_to_mp3(request):
                     '--force-ipv4',
                     '--remote-components', 'ejs:github',
                     '--geo-bypass',
-                    '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
+                    '--extractor-args', 'youtube:player_client=android,ios,web_embedded,mweb',
                     '--concurrent-fragments', '2',
                     '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/ba*/18/b/best',
                     '-x',
@@ -665,7 +665,7 @@ def download_stream(request):
                     '--force-ipv4',
                     '--remote-components', 'ejs:github',
                     '--geo-bypass',
-                    '--extractor-args', 'youtube:player_client=web_embedded,web,ios,mweb;youtubepot:provider=bgutil:http',
+                    '--extractor-args', 'youtube:player_client=android,ios,web_embedded,mweb',
                     '--concurrent-fragments', '2',
                     '-f', format_spec,
                     '--merge-output-format', 'mp4',
