@@ -74,17 +74,23 @@ def extract_with_ytdlp(video_url):
     last_err = None
 
     base_strategies = [
-        # Strategy 1: Multi-client mobile API (Android + iOS + mweb + web_embedded) - highest reliability, bypasses bot detection and ads without expired cookies
+        # Strategy 1: Multi-client mobile API (Android + iOS + mweb + web_embedded)
         {
             "geo_bypass": True,
             "force_ipv4": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "ios", "web_embedded", "mweb"],
+                    "player_client": ["android", "ios", "web_embedded", "mweb", "visionos"],
                 },
             },
         },
-        # Strategy 2: Web Embedded + Web with bgutil POT provider
+        # Strategy 2: Default extraction auto-client with visionos/mobile fallback
+        {
+            "geo_bypass": True,
+            "force_ipv4": True,
+            "remote_components": ["ejs:github"],
+        },
+        # Strategy 3: Web Embedded + Web with bgutil POT provider
         {
             "geo_bypass": True,
             "force_ipv4": True,
@@ -95,21 +101,6 @@ def extract_with_ytdlp(video_url):
                 "youtubepot": {
                     "provider": ["bgutil:http"],
                 },
-            },
-        },
-        # Strategy 3: Default extraction auto-client
-        {
-            "geo_bypass": True,
-            "force_ipv4": True,
-        },
-        # Strategy 4: TV embedded fallback
-        {
-            "geo_bypass": True,
-            "force_ipv4": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["tv_embedded", "tv"],
-                }
             },
         },
     ]
@@ -302,14 +293,19 @@ def extract_with_pytubefix(video_url):
     last_err = None
 
     client_candidates = [
+        "ANDROID",
         "ANDROID_VR",
         "IOS",
         "MWEB",
+        None,
     ]
 
     for client_name in client_candidates:
         try:
-            candidate_yt = YouTube(video_url, client=client_name)
+            if client_name:
+                candidate_yt = YouTube(video_url, client=client_name)
+            else:
+                candidate_yt = YouTube(video_url)
             _ = candidate_yt.streams
             yt = candidate_yt
             break
